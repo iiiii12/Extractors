@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Google Maps High-Res Image Extractor</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: #f4f4f4; color: #333; }
+        .container { background: #fff; padding: 20px; border-radius: 8px; max-width: 700px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        input[type="text"] { width: 100%; padding: 10px; margin: 10px 0; box-sizing: border-box; }
+        button { padding: 10px 20px; background: #28a745; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #218838; }
+        .result { margin-top: 20px; word-break: break-all; }
+        img { max-width: 100%; height: auto; margin-top: 10px; border-radius: 4px; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Google Maps High-Res Image Extractor</h2>
+    <p>Paste your Google Maps URL below to get the full-size image:</p>
+    <input type="text" id="urlInput" placeholder="Paste Maps URL here...">
+    <button onclick="extractImage()">Extract Full-Size Image</button>
+    <div class="result" id="resultArea"></div>
+</div>
+
+<script>
+function extractImage() {
+    const rawUrl = document.getElementById('urlInput').value;
+    const resultArea = document.getElementById('resultArea');
+    resultArea.innerHTML = '';
+
+    try {
+        const decodedUrl = decodeURIComponent(rawUrl);
+        
+        // Find the base googleusercontent image link before any size parameters
+        const match = decodedUrl.match(/(https:\/\/lh3\.googleusercontent\.com\/[^\s=]+)/);
+        
+        if (match && match[1]) {
+            const baseUrl = match[1];
+            
+            // Append high-res indicator parameter to force the original/large source size
+            const highResUrl = baseUrl + '=w2048';
+            
+            resultArea.innerHTML = `
+                <p><strong>Full-Size Image URL:</strong><br><a href="${highResUrl}" target="_blank">${highResUrl}</a></p>
+                <p><strong>Preview (Loaded at Max Resolution):</strong></p>
+                <img src="${highResUrl}" alt="High-Res Maps Image">
+            `;
+        } else {
+            resultArea.innerHTML = '<p style="color: red;">No valid Google image link found in this URL.</p>';
+        }
+    } catch (e) {
+        resultArea.innerHTML = '<p style="color: red;">Invalid URL format.</p>';
+    }
+}
+</script>
+
+</body>
+</html>
