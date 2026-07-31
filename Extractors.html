@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Multi-Provider Media Extractor V 2.7</title>
+  <title>Multi-Provider Media Extractor V 2.8</title>
   <style>
     :root {
       --bg-color: #0f172a;
@@ -229,7 +229,7 @@
 
   <div class="main-wrapper">
     <header>
-      <h1 id="app-header-title">Multi-Provider Media Extractor V 2.7</h1>
+      <h1 id="app-header-title">Multi-Provider Media Extractor V 2.8</h1>
       <p>Separate extractors arranged side-by-side for photos and video streams.</p>
     </header>
 
@@ -347,7 +347,7 @@
   </div>
 
   <script>
-    const APP_VERSION = "V 2.7";
+    const APP_VERSION = "V 2.8";
     const APP_NAME = "Multi-Provider Media Extractor";
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -356,65 +356,29 @@
       if (headerEl) headerEl.textContent = `${APP_NAME} ${APP_VERSION}`;
     });
 
-    /* Strict Binary Download Helper with MIME validation */
+    /* Robust Download Utility bypassing 403 blocks */
     async function triggerDirectDownload(fileUrl, filename) {
       try {
-        let blob = null;
-
-        // Try direct fetch first
-        try {
-          const directRes = await fetch(fileUrl, { mode: 'cors' });
-          if (directRes.ok) {
-            const b = await directRes.blob();
-            if (b.size > 50000 && !b.type.includes('html')) {
-              blob = b;
-            }
-          }
-        } catch (e) {}
-
-        // Fallback to CORS proxies with MIME validation
-        if (!blob) {
-          const streamProxies = [
-            `https://corsproxy.io/?${encodeURIComponent(fileUrl)}`,
-            `https://api.allorigins.win/raw?url=${encodeURIComponent(fileUrl)}`
-          ];
-
-          for (const proxy of streamProxies) {
-            try {
-              const res = await fetch(proxy);
-              if (res.ok) {
-                const contentType = res.headers.get('content-type') || '';
-                if (contentType.includes('html') || contentType.includes('text')) continue;
-
-                const buffer = await res.arrayBuffer();
-                if (buffer.byteLength > 50000) {
-                  const mime = filename.endsWith('.mp4') ? 'video/mp4' : 'image/jpeg';
-                  blob = new Blob([buffer], { type: mime });
-                  break;
-                }
-              }
-            } catch (e) {
-              continue;
-            }
-          }
+        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(fileUrl)}`;
+        const res = await fetch(proxyUrl);
+        if (!res.ok) throw new Error('Proxy fetch failed');
+        
+        const blob = await res.blob();
+        if (blob.size < 1000 || blob.type.includes('html')) {
+          throw new Error('Invalid payload received');
         }
 
-        if (blob) {
-          const blobUrl = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = blobUrl;
-          a.download = filename;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-          return;
-        }
-
-        // Fallback if CORS prevents blob creation: open direct URL in new tab
-        window.open(fileUrl, '_blank');
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
       } catch (err) {
-        window.open(fileUrl, '_blank');
+        // Fallback: Open clean proxy window directly if blob restriction triggers
+        window.open(`https://corsproxy.io/?${encodeURIComponent(fileUrl)}`, '_blank');
       }
     }
 
@@ -690,7 +654,7 @@
       showStatus('snapchat-status', 'info', 'Snapchat video stream loaded successfully!');
     }
 
-    /* 5. TWITTER / X */
+    /* 5. TWITTER / X (FIXED 403 CDN BLOCKS) */
     async function extractTwitter() {
       const input = document.getElementById('twitter-url').value.trim();
       const output = document.getElementById('twitter-output');
@@ -709,8 +673,7 @@
 
       const apiEndpoints = [
         `https://api.vxtwitter.com/status/${tweetId}`,
-        `https://api.fxtwitter.com/status/${tweetId}`,
-        `https://api.fixupx.com/status/${tweetId}`
+        `https://api.fxtwitter.com/status/${tweetId}`
       ];
 
       let mediaList = [];
@@ -762,15 +725,19 @@
 
       for (let idx = 0; idx < mediaList.length; idx++) {
         const m = mediaList[idx];
+        
+        // Route video player and download links through proxy/fx domain to prevent 403 errors
+        const safeStreamUrl = m.url.includes('video.twimg.com') ? `https://corsproxy.io/?${encodeURIComponent(m.url)}` : m.url;
+
         if (m.type === 'image' || m.type === 'photo') {
           preview.innerHTML += `<img src="${m.url}" alt="Twitter Image" />`;
           actions.innerHTML += `<button onclick="triggerDirectDownload('${m.url}', 'twitter-photo-${idx+1}.jpg')">⬇️ Download Photo ${idx+1}</button> `;
         } else if (m.type === 'video' || m.type === 'gif') {
           showStatus('twitter-status', 'info', 'Loading Twitter video stream...');
 
-          preview.innerHTML += `<video controls autoplay playsinline src="${m.url}" style="max-height:250px; width:100%;"></video>`;
+          preview.innerHTML += `<video controls autoplay playsinline src="${safeStreamUrl}" style="max-height:250px; width:100%;"></video>`;
           actions.innerHTML += `<button onclick="triggerDirectDownload('${m.url}', 'twitter-video.mp4')">⬇️ Download Video (MP4)</button> `;
-          actions.innerHTML += `<a href="${m.url}" target="_blank" rel="noopener noreferrer"><button class="btn-secondary">🔗 Direct CDN Link</button></a> `;
+          actions.innerHTML += `<a href="https://d.fxtwitter.com/status/${tweetId}" target="_blank" rel="noopener noreferrer"><button class="btn-secondary">🔗 Direct CDN Link</button></a> `;
         }
       }
 
@@ -820,7 +787,7 @@
         }
 
         output.classList.add('active');
-        showStatus('instagram-status', 'info', 'Instagram media stream ready!');
+        showStatus('twitter-status', 'info', 'Instagram media stream ready!');
       } catch (err) {
         showStatus('instagram-status', 'error', 'Failed to extract Instagram media: ' + err.message);
       }
