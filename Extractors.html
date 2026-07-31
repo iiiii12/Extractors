@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Multi-Provider Media Extractor V 1.2</title>
+  <title>Multi-Provider Media Extractor V 1.3</title>
   <style>
     :root {
       --bg-color: #0f172a;
@@ -229,7 +229,7 @@
 
   <div class="main-wrapper">
     <header>
-      <h1 id="app-header-title">Multi-Provider Media Extractor V 1.2</h1>
+      <h1 id="app-header-title">Multi-Provider Media Extractor V 1.3</h1>
       <p>Separate extractors arranged side-by-side for photos and video streams.</p>
     </header>
 
@@ -240,7 +240,7 @@
         <div>
           <h2>📍 Google Maps</h2>
           <div class="input-group">
-            <input type="text" id="gmaps-url" placeholder="Paste Google Maps photo URL..." />
+            <input type="text" id="gmaps-url" placeholder="Paste Maps URL (normal or short)..." />
             <button onclick="extractGmapsImage()">Extract</button>
           </div>
           <div id="gmaps-status" class="status-msg"></div>
@@ -347,8 +347,8 @@
   </div>
 
   <script>
-    /* Version Tracking - V 1.2 */
-    const APP_VERSION = "V 1.2";
+    /* Version Tracking - V 1.3 */
+    const APP_VERSION = "V 1.3";
     const APP_NAME = "Multi-Provider Media Extractor";
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -384,9 +384,8 @@
     /* Helper: Proxy fallback fetching */
     async function fetchWithCorsFallback(targetUrl) {
       const proxies = [
-        url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
         url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
-        url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
+        url => `https://corsproxy.io/?${encodeURIComponent(url)}`
       ];
 
       for (let i = 0; i < proxies.length; i++) {
@@ -415,35 +414,8 @@
       el.textContent = message;
     }
 
-    /* Helper: Key Extraction and Sanitization Engine */
-    function sanitizePhotoKey(rawKey) {
-      if (!rawKey) return null;
-      let clean = rawKey.split('!')[0].split('?')[0].split('=')[0].split('&')[0];
-      return clean.length >= 15 ? clean : null;
-    }
-
-    function extractKeyFromString(str) {
-      if (!str) return null;
-      let decoded = str;
-      try { decoded = decodeURIComponent(str); } catch(e) {}
-
-      const afMatch = decoded.match(/AF1Qip[A-Za-z0-9_-]{20,}/);
-      if (afMatch) return sanitizePhotoKey(afMatch[0]);
-
-      const caacMatch = decoded.match(/CAAC[A-Za-z0-9_-]{20,}/);
-      if (caacMatch) return sanitizePhotoKey(caacMatch[0]);
-
-      const paramMatch = decoded.match(/!1s([A-Za-z0-9_-]{20,})/);
-      if (paramMatch) return sanitizePhotoKey(paramMatch[1]);
-
-      const cdnPathMatch = decoded.match(/\/p\/([A-Za-z0-9_-]{20,})/);
-      if (cdnPathMatch) return sanitizePhotoKey(cdnPathMatch[1]);
-
-      return null;
-    }
-
     /* ==========================================================================
-       1. GOOGLE MAPS EXTRACTION ENGINE V 1.2
+       1. GOOGLE MAPS EXTRACTION ENGINE V 1.3
        ========================================================================== */
     async function extractGmapsImage() {
       const inputRaw = document.getElementById('gmaps-url').value.trim();
@@ -460,63 +432,59 @@
         return;
       }
 
-      showStatus(statusId, 'info', 'Expanding link and parsing photo key...');
-
-      let photoKey = extractKeyFromString(inputRaw);
-
-      if (!photoKey) {
+      // Exact matching logic from the working single-card extractor
+      function parseGmapsUrl(str) {
         try {
-          const res = await fetchWithCorsFallback(inputRaw);
-          photoKey = extractKeyFromString(res.finalUrl);
-          if (!photoKey && res.content) {
-            const cleanContent = res.content.replace(/\\/g, '');
-            photoKey = extractKeyFromString(cleanContent);
+          const decodedUrl = decodeURIComponent(str);
+          const match = decodedUrl.match(/(https:\/\/lh3\.googleusercontent\.com\/[^\s=]+)/);
+          if (match && match[1]) {
+            return match[1] + '=w2048';
+          }
+        } catch (e) {
+          return null;
+        }
+        return null;
+      }
+
+      // Step 1: Try direct extraction first (Fast path for normal URLs)
+      let highResUrl = parseGmapsUrl(inputRaw);
+
+      // Step 2: If direct extraction failed, expand as short URL via CORS proxy
+      if (!highResUrl) {
+        showStatus(statusId, 'info', 'Expanding short link...');
+        try {
+          const proxyRes = await fetchWithCorsFallback(inputRaw);
+          highResUrl = parseGmapsUrl(proxyRes.finalUrl);
+
+          if (!highResUrl && proxyRes.content) {
+            highResUrl = parseGmapsUrl(proxyRes.content);
           }
         } catch (err) {
-          // Fallback parsing
+          showStatus(statusId, 'error', 'Failed to expand short URL.');
+          return;
         }
       }
 
-      let finalHighResUrl = null;
-
-      if (photoKey) {
-        // Use =w2048-h2048 instead of =s0 to eliminate HTTP 400 Bad Request
-        finalHighResUrl = `https://lh3.googleusercontent.com/p/${photoKey}=w2048-h2048`;
-      } else {
-        const cdnDirectMatch = inputRaw.match(/https?:\/\/[^"'\s<>]*(?:googleusercontent\.com|ggpht\.com)\/[^"'\s<>]*/i);
-        if (cdnDirectMatch) {
-          const cleanBase = cdnDirectMatch[0].split('=')[0];
-          finalHighResUrl = `${cleanBase}=w2048-h2048`;
-        }
-      }
-
-      if (!finalHighResUrl) {
-        showStatus(statusId, 'error', 'Could not extract photo CDN. Please verify the URL points directly to a photo on Google Maps.');
+      if (!highResUrl) {
+        showStatus(statusId, 'error', 'No valid Google image link found in this URL.');
         return;
       }
 
-      preview.src = finalHighResUrl;
-      link.href = finalHighResUrl;
+      // Display results
+      preview.src = highResUrl;
+      link.href = highResUrl;
 
       downloadBtn.onclick = () => {
-        triggerDirectDownload(finalHighResUrl, 'google-maps-photo-highres.jpg');
+        triggerDirectDownload(highResUrl, 'google-maps-photo-highres.jpg');
       };
 
       preview.onload = () => {
         output.classList.add('active');
-        showStatus(statusId, 'info', 'High-res image extracted successfully!');
+        showStatus(statusId, 'info', 'Full-size image extracted successfully!');
       };
 
       preview.onerror = () => {
-        // Fallback to base URL without parameters if CDN parameter fails
-        const fallbackUrl = finalHighResUrl.split('=')[0];
-        preview.src = fallbackUrl;
-        link.href = fallbackUrl;
-        downloadBtn.onclick = () => {
-          triggerDirectDownload(fallbackUrl, 'google-maps-photo.jpg');
-        };
-        output.classList.add('active');
-        showStatus(statusId, 'info', 'Extracted via direct base CDN URL.');
+        showStatus(statusId, 'error', 'Error loading image from CDN.');
       };
     }
 
