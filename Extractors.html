@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Multi-Provider Media Downloader</title>
+  <title>Multi-Provider Media Extractor V 1.0</title>
   <style>
     :root {
       --bg-color: #0f172a;
@@ -230,13 +230,13 @@
 
   <div class="main-wrapper">
     <header>
-      <h1>Multi-Provider Media Extractor V 1.0</h1>
+      <h1 id="app-header-title">Multi-Provider Media Extractor V 1.0</h1>
       <p>Separate extractors arranged side-by-side for photos and video streams.</p>
     </header>
 
     <div class="grid-container">
 
-      <!-- 1. GOOGLE MAPS (FIXED FOR SHORT URLS & PROXY BLOCKS) -->
+      <!-- 1. GOOGLE MAPS -->
       <section class="card">
         <div>
           <h2>📍 Google Maps</h2>
@@ -348,6 +348,16 @@
   </div>
 
   <script>
+    /* Version Tracking */
+    const APP_VERSION = "V 1.0";
+    const APP_NAME = "Multi-Provider Media Extractor";
+
+    window.addEventListener('DOMContentLoaded', () => {
+      document.title = `${APP_NAME} ${APP_VERSION}`;
+      const headerEl = document.getElementById('app-header-title');
+      if (headerEl) headerEl.textContent = `${APP_NAME} ${APP_VERSION}`;
+    });
+
     /* Helper: Triggers download via Blob or Direct Anchor */
     async function triggerDirectDownload(fileUrl, filename) {
       try {
@@ -432,8 +442,18 @@
       el.textContent = message;
     }
 
+    /* Clean & Format Google CDN URL without triggering 400 Bad Request */
+    function formatGoogleCdnUrl(rawCdnUrl) {
+      let cleanUrl = rawCdnUrl.trim().replace(/["'\\]/g, '');
+      
+      if (cleanUrl.includes('=')) {
+        cleanUrl = cleanUrl.split('=')[0];
+      }
+      return `${cleanUrl}=s0`;
+    }
+
     /* ==========================================================================
-       1. GOOGLE MAPS (ROBUST FIX FOR SHORT URLs & CORS PROXY BLOCKS)
+       1. GOOGLE MAPS (FIXED FOR 400 ERROR & SHORT URLS)
        ========================================================================== */
     async function extractGmapsImage() {
       const inputRaw = document.getElementById('gmaps-url').value.trim();
@@ -452,7 +472,7 @@
 
       showStatus(statusId, 'info', 'Expanding short link and parsing photo...');
 
-      const cdnRegex = /(https?:\/\/[^"'\s=!#]+\.(?:googleusercontent|ggpht)\.com\/[^"'\s=!#]+(=[^"'\s!]*)?)/i;
+      const cdnRegex = /(https?:\/\/[^"'\s=!#]+\.(?:googleusercontent|ggpht)\.com\/[^"'\s=!#]+)/i;
       let targetCdnUrl = null;
 
       let decodedInput = inputRaw;
@@ -462,14 +482,12 @@
         decodedInput = inputRaw;
       }
 
-      // Check 1: Direct CDN link in text
       const directMatch = decodedInput.match(cdnRegex);
       if (directMatch) {
         targetCdnUrl = directMatch[1];
       } else if (inputRaw.includes('googleusercontent.com') || inputRaw.includes('ggpht.com')) {
         targetCdnUrl = inputRaw;
       } else {
-        // Check 2: Unshorten the URL via dedicated redirect API first
         let expandedUrl = null;
         if (inputRaw.includes('goo.gl') || inputRaw.includes('maps.app.goo.gl') || inputRaw.includes('page.link')) {
           expandedUrl = await resolveShortUrl(inputRaw);
@@ -481,7 +499,6 @@
         if (expandedMatch) {
           targetCdnUrl = expandedMatch[1];
         } else {
-          // Check 3: Fetch page HTML via CORS proxy as backup
           try {
             const htmlText = await fetchWithCorsFallback(urlToParse);
             const htmlMatch = htmlText.match(cdnRegex);
@@ -494,7 +511,6 @@
               }
             }
           } catch (err) {
-            // Fallback: Check if expanded URL has embedded parameters
             if (urlToParse.includes('google.com/maps')) {
               const photoMatch = urlToParse.match(/!1s([^!]+)!2e/);
               if (photoMatch) {
@@ -510,15 +526,7 @@
         return;
       }
 
-      let highResUrl = targetCdnUrl;
-      if (highResUrl.includes('=')) {
-        highResUrl = highResUrl.replace(/=w\d+-h\d+/, '=w4080-h4080');
-        if (!highResUrl.includes('w4080')) {
-          highResUrl = highResUrl.replace(/=.*$/, '=w4080-h4080');
-        }
-      } else {
-        highResUrl += '=w4080-h4080';
-      }
+      const highResUrl = formatGoogleCdnUrl(targetCdnUrl);
 
       preview.src = highResUrl;
       link.href = highResUrl;
@@ -533,14 +541,14 @@
       };
 
       preview.onerror = () => {
-        const fallbackUrl = targetCdnUrl.split('=')[0] + '=s0';
-        preview.src = fallbackUrl;
-        link.href = fallbackUrl;
+        const rawFallback = targetCdnUrl.split('=')[0];
+        preview.src = rawFallback;
+        link.href = rawFallback;
         downloadBtn.onclick = () => {
-          triggerDirectDownload(fallbackUrl, 'google-maps-photo-highres.jpg');
+          triggerDirectDownload(rawFallback, 'google-maps-photo.jpg');
         };
         output.classList.add('active');
-        showStatus(statusId, 'info', 'High-res image extracted via fallback parameter (=s0).');
+        showStatus(statusId, 'info', 'High-res image extracted via base CDN URL.');
       };
     }
 
