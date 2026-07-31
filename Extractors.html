@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Multi-Provider Media Extractor V 2.1</title>
+  <title>Multi-Provider Media Extractor V 1.1</title>
   <style>
     :root {
       --bg-color: #0f172a;
@@ -229,7 +229,7 @@
 
   <div class="main-wrapper">
     <header>
-      <h1 id="app-header-title">Multi-Provider Media Extractor V 2.1</h1>
+      <h1 id="app-header-title">Multi-Provider Media Extractor V 1.1</h1>
       <p>Separate extractors arranged side-by-side for photos and video streams.</p>
     </header>
 
@@ -347,8 +347,8 @@
   </div>
 
   <script>
-    /* Version Tracking */
-    const APP_VERSION = "V 1.0";
+    /* Version Tracking - Strictly Incremented */
+    const APP_VERSION = "V 1.1";
     const APP_NAME = "Multi-Provider Media Extractor";
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -384,8 +384,8 @@
     /* Helper: Proxy fallback fetching */
     async function fetchWithCorsFallback(targetUrl) {
       const proxies = [
-        url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
         url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+        url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
         url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
       ];
 
@@ -397,10 +397,10 @@
 
           if (proxies[i].toString().includes('allorigins')) {
             const data = await response.json();
-            if (data.contents) return data.contents;
+            if (data.contents) return { content: data.contents, finalUrl: data.status?.url || targetUrl };
           } else {
             const text = await response.text();
-            if (text && text.length > 50) return text;
+            if (text && text.length > 50) return { content: text, finalUrl: response.url || targetUrl };
           }
         } catch (e) {
           continue;
@@ -416,8 +416,32 @@
     }
 
     /* ==========================================================================
-       1. GOOGLE MAPS (DIRECT PHOTO KEY EXTRACTION ENGINE)
+       1. GOOGLE MAPS (ENHANCED PHOTO KEY EXTRACTION ENGINE V 1.1)
        ========================================================================== */
+    function extractKeyFromString(str) {
+      if (!str) return null;
+      let decoded = str;
+      try { decoded = decodeURIComponent(str); } catch(e) {}
+      
+      // Match AF1Qip keys
+      const afMatch = decoded.match(/AF1Qip[A-Za-z0-9_-]{20,}/);
+      if (afMatch) return afMatch[0];
+
+      // Match CAAC keys
+      const caacMatch = decoded.match(/CAAC[A-Za-z0-9_-]{20,}/);
+      if (caacMatch) return caacMatch[0];
+
+      // Match !1s parameter pattern
+      const paramMatch = decoded.match(/!1s([A-Za-z0-9_-]{20,})/);
+      if (paramMatch) return paramMatch[1];
+
+      // Match /p/ CDN path key
+      const cdnPathMatch = decoded.match(/\/p\/([A-Za-z0-9_-]{20,})/);
+      if (cdnPathMatch) return cdnPathMatch[1];
+
+      return null;
+    }
+
     async function extractGmapsImage() {
       const inputRaw = document.getElementById('gmaps-url').value.trim();
       const statusId = 'gmaps-status';
@@ -433,92 +457,44 @@
         return;
       }
 
-      showStatus(statusId, 'info', 'Expanding short link and parsing photo...');
+      showStatus(statusId, 'info', 'Expanding link and parsing photo key...');
 
-      let photoKey = null;
-      let targetCdnUrl = null;
+      // Step 1: Client-side extraction directly from user input string
+      let photoKey = extractKeyFromString(inputRaw);
 
-      let decodedInput = inputRaw;
-      try {
-        decodedInput = decodeURIComponent(inputRaw);
-      } catch (e) {
-        decodedInput = inputRaw;
-      }
-
-      // Step 1: Check for direct AF1Qip photo key in user input
-      const keyMatch = decodedInput.match(/AF1Qip[A-Za-z0-9_-]{20,}/);
-      if (keyMatch) {
-        photoKey = keyMatch[0];
-      }
-
-      // Step 2: Check for direct CDN URL
+      // Step 2: Fetch via proxy and parse both final redirected URL and body
       if (!photoKey) {
-        const cdnMatch = decodedInput.match(/https?:\/\/[^"'\s<>]*(?:googleusercontent\.com|ggpht\.com)\/[^"'\s<>]*/i);
-        if (cdnMatch) {
-          targetCdnUrl = cdnMatch[0].replace(/\\/g, '');
-        }
-      }
+        try {
+          const res = await fetchWithCorsFallback(inputRaw);
+          
+          // Check final expanded redirect URL first (most reliable for short links)
+          photoKey = extractKeyFromString(res.finalUrl);
 
-      // Step 3: Fetch HTML via proxies if photo key not found in input
-      if (!photoKey && !targetCdnUrl) {
-        const proxies = [
-          url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
-          url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-          url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
-        ];
-
-        for (const proxyFn of proxies) {
-          try {
-            const pUrl = proxyFn(inputRaw);
-            const res = await fetch(pUrl);
-            if (!res.ok) continue;
-
-            let htmlContent = '';
-            if (pUrl.includes('allorigins')) {
-              const json = await res.json();
-              htmlContent = json.contents || '';
-            } else {
-              htmlContent = await res.text();
-            }
-
-            if (htmlContent && htmlContent.length > 50) {
-              const cleanedHtml = htmlContent.replace(/\\/g, '').replace(/&amp;/g, '&');
-              
-              const proxyKeyMatch = cleanedHtml.match(/AF1Qip[A-Za-z0-9_-]{20,}/);
-              if (proxyKeyMatch) {
-                photoKey = proxyKeyMatch[0];
-                break;
-              }
-
-              const proxyCdnMatch = cleanedHtml.match(/https?:\/\/[^"'\s<>]*(?:googleusercontent\.com|ggpht\.com)\/[^"'\s<>]*/i);
-              if (proxyCdnMatch) {
-                targetCdnUrl = proxyCdnMatch[0];
-                break;
-              }
-            }
-          } catch (err) {
-            continue;
+          // If still not found, check returned HTML content
+          if (!photoKey && res.content) {
+            const cleanContent = res.content.replace(/\\/g, '');
+            photoKey = extractKeyFromString(cleanContent);
           }
+        } catch (err) {
+          // Fallback parsing if fetch fails
         }
       }
 
-      // Step 4: Build final guaranteed high-res URL
+      // Step 3: Construct guaranteed max-res CDN URL
       let finalHighResUrl = null;
 
       if (photoKey) {
         finalHighResUrl = `https://lh3.googleusercontent.com/p/${photoKey}=s0`;
-      } else if (targetCdnUrl) {
-        const cleanBase = targetCdnUrl.split('=')[0];
-        finalHighResUrl = `${cleanBase}=s0`;
       } else {
-        const panoidMatch = decodedInput.match(/!1s([^!]+)!2e/);
-        if (panoidMatch) {
-          finalHighResUrl = `https://streetviewpixels-pa.googleapis.com/v1/tile?panoid=${panoidMatch[1]}&x=0&y=0&zoom=0`;
+        const cdnDirectMatch = inputRaw.match(/https?:\/\/[^"'\s<>]*(?:googleusercontent\.com|ggpht\.com)\/[^"'\s<>]*/i);
+        if (cdnDirectMatch) {
+          const cleanBase = cdnDirectMatch[0].split('=')[0];
+          finalHighResUrl = `${cleanBase}=s0`;
         }
       }
 
       if (!finalHighResUrl) {
-        showStatus(statusId, 'error', 'Could not extract photo CDN. Please copy the direct photo URL from Google Maps.');
+        showStatus(statusId, 'error', 'Could not extract photo CDN. Please verify the URL points to a photo on Google Maps.');
         return;
       }
 
@@ -604,7 +580,8 @@
       showStatus('tiktok-status', 'info', 'Fetching video stream...');
 
       try {
-        const htmlText = await fetchWithCorsFallback(input);
+        const res = await fetchWithCorsFallback(input);
+        const htmlText = res.content;
 
         const mp4Match = htmlText.match(/https?:\/\/[^"'\s]+\.tiktokcdn\.com\/[^"'\s]+\.mp4[^"'\s]*/i) || 
                          htmlText.match(/\"playAddr\":\"(https?:\\\/\\\/[^"]+)\"/i);
@@ -643,7 +620,8 @@
       showStatus('snapchat-status', 'info', 'Fetching video stream...');
 
       try {
-        const htmlText = await fetchWithCorsFallback(input);
+        const res = await fetchWithCorsFallback(input);
+        const htmlText = res.content;
 
         const videoMatch = htmlText.match(/<meta\s+property="og:video"\s+content="([^"]+)"/i) ||
                            htmlText.match(/(https?:\/\/[^"'\s]+\.sc-cdn\.net\/[^"'\s>]+\.mp4[^"'\s]*)/i) ||
@@ -737,7 +715,8 @@
         let ddUrl = input.replace('instagram.com', 'ddinstagram.com');
         if (!ddUrl.endsWith('/')) ddUrl += '/';
 
-        const htmlText = await fetchWithCorsFallback(ddUrl);
+        const res = await fetchWithCorsFallback(ddUrl);
+        const htmlText = res.content;
 
         const vidMatch = htmlText.match(/<meta\s+property="og:video"\s+content="([^"]+)"/i);
         const imgMatch = htmlText.match(/<meta\s+property="og:image"\s+content="([^"]+)"/i);
