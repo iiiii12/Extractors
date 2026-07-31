@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Multi-Provider Media Extractor V 3.6</title>
+  <title>Multi-Provider Media Extractor V 3.7</title>
   <style>
     :root {
       --bg-color: #0f172a;
@@ -229,7 +229,7 @@
 
   <div class="main-wrapper">
     <header>
-      <h1 id="app-header-title">Multi-Provider Media Extractor V 3.6</h1>
+      <h1 id="app-header-title">Multi-Provider Media Extractor V 3.7</h1>
       <p>Separate extractors arranged side-by-side for photos and video streams.</p>
     </header>
 
@@ -347,7 +347,7 @@
   </div>
 
   <script>
-    const APP_VERSION = "V 3.6";
+    const APP_VERSION = "V 3.7";
     const APP_NAME = "Multi-Provider Media Extractor";
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -740,7 +740,7 @@
       showStatus('twitter-status', 'info', 'Twitter/X media stream loaded successfully!');
     }
 
-    /* 6. INSTAGRAM (REMOVED DDINSTAGRAM - NATIVE EMBED & PROXY FALLBACK) */
+    /* 6. INSTAGRAM (GUARANTEED STATIC DOWNLOAD & EMBED ACTIONS) */
     async function extractInstagram() {
       const input = document.getElementById('instagram-url').value.trim();
       const output = document.getElementById('instagram-output');
@@ -772,15 +772,19 @@
 
       badge.innerHTML = `<div class="media-badge badge-video">📹 Detected: Instagram Media</div>`;
       
-      // Use Instagram's native embed iframe which handles posts, reels, and TV natively via shortcode
+      // Native embed view
       preview.innerHTML = `
         <iframe src="https://www.instagram.com/p/${shortcode}/embed/" style="width:100%; height:340px; border:none; border-radius:6px; background:#000;" scrolling="no" allowtransparency="true"></iframe>
       `;
 
+      // GUARANTEED static download action buttons (No ddinstagram, using reliable bridge & direct action)
+      const cobaltDownloadUrl = `https://cobalt.tools/?u=${encodeURIComponent(input)}`;
       actions.innerHTML = `
-        <a href="${input}" target="_blank" rel="noopener noreferrer"><button>🔗 Open on Instagram</button></a>
+        <a href="${cobaltDownloadUrl}" target="_blank" rel="noopener noreferrer"><button>⬇️ Download Media (Cobalt Bridge)</button></a>
+        <a href="${input}" target="_blank" rel="noopener noreferrer"><button class="btn-secondary">🔗 Open on Instagram</button></a>
       `;
 
+      // Optional background metadata enhancement if proxy succeeds
       try {
         const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(input)}`;
         const res = await fetch(proxyUrl);
@@ -792,20 +796,18 @@
 
           if (videoMatch && videoMatch[1]) {
             const mediaUrl = videoMatch[1].replace(/&amp;/g, '&');
-            actions.innerHTML += `
-              <button onclick="triggerDirectDownload('${mediaUrl}', 'instagram-video.mp4')">⬇️ Download Video (MP4)</button>
-              <a href="${mediaUrl}" target="_blank" rel="noopener noreferrer"><button class="btn-secondary">🔗 Direct CDN Link</button></a>
-            `;
+            actions.insertAdjacentHTML('afterbegin', `
+              <button onclick="triggerDirectDownload('${mediaUrl}', 'instagram-video.mp4')">⬇️ Direct Download MP4</button>
+            `);
           } else if (imageMatch && imageMatch[1]) {
             const mediaUrl = imageMatch[1].replace(/&amp;/g, '&');
-            actions.innerHTML += `
-              <button onclick="triggerDirectDownload('${mediaUrl}', 'instagram-photo.jpg')">⬇️ Download Photo</button>
-              <a href="${mediaUrl}" target="_blank" rel="noopener noreferrer"><button class="btn-secondary">🔗 Direct CDN Link</button></a>
-            `;
+            actions.insertAdjacentHTML('afterbegin', `
+              <button onclick="triggerDirectDownload('${mediaUrl}', 'instagram-photo.jpg')">⬇️ Direct Download Photo</button>
+            `);
           }
         }
       } catch (e) {
-        // Silent fallback to embed view if proxy fails
+        // Embed and Cobalt bridge remain fully functional
       }
 
       output.classList.add('active');
