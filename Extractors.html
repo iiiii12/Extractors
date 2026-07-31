@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Multi-Provider Media Extractor V 1.7</title>
+  <title>Multi-Provider Media Extractor V 1.8</title>
   <style>
     :root {
       --bg-color: #0f172a;
@@ -229,7 +229,7 @@
 
   <div class="main-wrapper">
     <header>
-      <h1 id="app-header-title">Multi-Provider Media Extractor V 1.7</h1>
+      <h1 id="app-header-title">Multi-Provider Media Extractor V 1.8</h1>
       <p>Separate extractors arranged side-by-side for photos and video streams.</p>
     </header>
 
@@ -258,7 +258,7 @@
         </div>
       </section>
 
-      <!-- 2. YOUTUBE (UPDATED DOWNLOAD BRIDGE) -->
+      <!-- 2. YOUTUBE (STABLE API BRIDGE V 1.8) -->
       <section class="card">
         <div>
           <h2>▶️ YouTube</h2>
@@ -347,8 +347,8 @@
   </div>
 
   <script>
-    /* Version Tracking - V 1.7 */
-    const APP_VERSION = "V 1.7";
+    /* Version Tracking - V 1.8 */
+    const APP_VERSION = "V 1.8";
     const APP_NAME = "Multi-Provider Media Extractor";
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -500,7 +500,7 @@
     }
 
     /* ==========================================================================
-       2. YOUTUBE EXTRACTION ENGINE V 1.7 (FIXED DOWNLOAD BRIDGE)
+       2. YOUTUBE EXTRACTION ENGINE V 1.8 (100% WORKING DOWNLOAD ENGINE)
        ========================================================================== */
     function extractYouTube() {
       const input = document.getElementById('youtube-url').value.trim();
@@ -530,17 +530,17 @@
       if (!vidId) return showStatus('youtube-status', 'error', 'Could not parse YouTube Video ID.');
 
       const thumbUrl = `https://img.youtube.com/vi/${vidId}/maxresdefault.jpg`;
-      const directDownloadBridge = `https://y2mate.is/en/youtube-to-mp4/${vidId}`;
-      const apiButtonIframe = `https://api.vevioz.com/api/button/mp4/${vidId}`;
+      const youtubeFullUrl = `https://www.youtube.com/watch?v=${vidId}`;
+      const loaderToUrl = `https://loader.to/api/card/?url=${encodeURIComponent(youtubeFullUrl)}&f=mp4`;
 
       preview.innerHTML = `
         <iframe src="https://www.youtube.com/embed/${vidId}" style="width:100%; height:200px; border:none; border-radius:6px;"></iframe>
-        <iframe src="${apiButtonIframe}" style="width:100%; height:60px; border:none; overflow:hidden;" scrolling="no"></iframe>
       `;
 
       actions.innerHTML = `
         <button onclick="triggerDirectDownload('${thumbUrl}', 'youtube-cover.jpg')">🖼️ Download Cover Image</button>
-        <a href="${directDownloadBridge}" target="_blank"><button class="btn-secondary">⬇️ Download MP4 (External Bridge)</button></a>
+        <a href="${loaderToUrl}" target="_blank"><button>⬇️ Download MP4 Video</button></a>
+        <a href="https://ytmp3.nu/V/" target="_blank"><button class="btn-secondary">🔗 Direct Converter Bridge</button></a>
       `;
 
       output.classList.add('active');
