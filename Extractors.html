@@ -230,13 +230,13 @@
 
   <div class="main-wrapper">
     <header>
-      <h1>Multi-Provider Media Extractor 7</h1>
+      <h1>Multi-Provider Media Extractor V 1.0</h1>
       <p>Separate extractors arranged side-by-side for photos and video streams.</p>
     </header>
 
     <div class="grid-container">
 
-      <!-- 1. GOOGLE MAPS (HANDLES BOTH LONG & SHORT URLs) -->
+      <!-- 1. GOOGLE MAPS (FIXED FOR SHORT URLS & PROXY BLOCKS) -->
       <section class="card">
         <div>
           <h2>📍 Google Maps</h2>
@@ -400,6 +400,32 @@
       throw new Error('All CORS proxies failed to fetch target page.');
     }
 
+    /* Helper: Resolves short URLs via dedicated unshorten services */
+    async function resolveShortUrl(shortUrl) {
+      const unshortenApis = [
+        async (url) => {
+          const res = await fetch(`https://unshorten.me/json/${encodeURIComponent(url)}`);
+          const data = await res.json();
+          return data.resolved_url || null;
+        },
+        async (url) => {
+          const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
+          const data = await res.json();
+          return data.status?.url || null;
+        }
+      ];
+
+      for (const api of unshortenApis) {
+        try {
+          const resolved = await api(shortUrl);
+          if (resolved && resolved !== shortUrl) return resolved;
+        } catch (e) {
+          continue;
+        }
+      }
+      return null;
+    }
+
     function showStatus(elementId, type, message) {
       const el = document.getElementById(elementId);
       el.className = `status-msg ${type}`;
@@ -407,7 +433,7 @@
     }
 
     /* ==========================================================================
-       1. GOOGLE MAPS (UPDATED: SUPPORTS BOTH LONG & SHORT URLs)
+       1. GOOGLE MAPS (ROBUST FIX FOR SHORT URLs & CORS PROXY BLOCKS)
        ========================================================================== */
     async function extractGmapsImage() {
       const inputRaw = document.getElementById('gmaps-url').value.trim();
@@ -424,7 +450,7 @@
         return;
       }
 
-      showStatus(statusId, 'info', 'Expanding URL and extracting image...');
+      showStatus(statusId, 'info', 'Expanding short link and parsing photo...');
 
       const cdnRegex = /(https?:\/\/[^"'\s=!#]+\.(?:googleusercontent|ggpht)\.com\/[^"'\s=!#]+(=[^"'\s!]*)?)/i;
       let targetCdnUrl = null;
@@ -436,33 +462,51 @@
         decodedInput = inputRaw;
       }
 
-      // Check 1: Direct match in URL text
+      // Check 1: Direct CDN link in text
       const directMatch = decodedInput.match(cdnRegex);
       if (directMatch) {
         targetCdnUrl = directMatch[1];
       } else if (inputRaw.includes('googleusercontent.com') || inputRaw.includes('ggpht.com')) {
         targetCdnUrl = inputRaw;
       } else {
-        // Check 2: Shortened URL (e.g. maps.app.goo.gl) - Fetch resolved HTML
-        try {
-          const htmlText = await fetchWithCorsFallback(inputRaw);
-          const htmlMatch = htmlText.match(cdnRegex);
-          if (htmlMatch) {
-            targetCdnUrl = htmlMatch[1];
-          } else {
-            const ogMatch = htmlText.match(/<meta\s+property="og:image"\s+content="([^"]+)"/i);
-            if (ogMatch && (ogMatch[1].includes('googleusercontent') || ogMatch[1].includes('ggpht'))) {
-              targetCdnUrl = ogMatch[1];
+        // Check 2: Unshorten the URL via dedicated redirect API first
+        let expandedUrl = null;
+        if (inputRaw.includes('goo.gl') || inputRaw.includes('maps.app.goo.gl') || inputRaw.includes('page.link')) {
+          expandedUrl = await resolveShortUrl(inputRaw);
+        }
+
+        const urlToParse = expandedUrl || inputRaw;
+        const expandedMatch = urlToParse.match(cdnRegex);
+
+        if (expandedMatch) {
+          targetCdnUrl = expandedMatch[1];
+        } else {
+          // Check 3: Fetch page HTML via CORS proxy as backup
+          try {
+            const htmlText = await fetchWithCorsFallback(urlToParse);
+            const htmlMatch = htmlText.match(cdnRegex);
+            if (htmlMatch) {
+              targetCdnUrl = htmlMatch[1];
+            } else {
+              const ogMatch = htmlText.match(/<meta\s+property="og:image"\s+content="([^"]+)"/i);
+              if (ogMatch && (ogMatch[1].includes('googleusercontent') || ogMatch[1].includes('ggpht'))) {
+                targetCdnUrl = ogMatch[1];
+              }
+            }
+          } catch (err) {
+            // Fallback: Check if expanded URL has embedded parameters
+            if (urlToParse.includes('google.com/maps')) {
+              const photoMatch = urlToParse.match(/!1s([^!]+)!2e/);
+              if (photoMatch) {
+                targetCdnUrl = `https://streetviewpixels-pa.googleapis.com/v1/tile?panoid=${photoMatch[1]}&x=0&y=0&zoom=0`;
+              }
             }
           }
-        } catch (err) {
-          showStatus(statusId, 'error', 'Failed to expand short URL: ' + err.message);
-          return;
         }
       }
 
       if (!targetCdnUrl) {
-        showStatus(statusId, 'error', 'Could not locate an embedded photo CDN link in this URL.');
+        showStatus(statusId, 'error', 'Could not extract photo CDN. Please copy the direct photo URL from Google Maps browser bar.');
         return;
       }
 
