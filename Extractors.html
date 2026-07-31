@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Client-Side Media & Google Maps Image Extractor</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #334155;
+      --error: #ef4444;
+      --success: #22c55e;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 2rem 1rem;
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 800px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    header {
+      text-align: center;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+      color: var(--text-main);
+    }
+
+    header p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+
+    .card h2 {
+      font-size: 1.25rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .input-group {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    input[type="url"] {
+      flex: 1;
+      background-color: var(--bg-color);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input[type="url"]:focus {
+      border-color: var(--accent);
+    }
+
+    button {
+      background-color: var(--accent);
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      white-space: nowrap;
+    }
+
+    button:hover {
+      background-color: var(--accent-hover);
+    }
+
+    .hint {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+      line-height: 1.4;
+    }
+
+    .output-area {
+      margin-top: 1rem;
+      border-top: 1px solid var(--border);
+      padding-top: 1rem;
+      display: none;
+    }
+
+    .output-area.active {
+      display: block;
+    }
+
+    .preview-container {
+      width: 100%;
+      border-radius: 8px;
+      overflow: hidden;
+      background-color: var(--bg-color);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-bottom: 1rem;
+      max-height: 500px;
+    }
+
+    .preview-container img, 
+    .preview-container video {
+      max-width: 100%;
+      max-height: 500px;
+      object-fit: contain;
+    }
+
+    .preview-container iframe {
+      width: 100%;
+      height: 400px;
+      border: none;
+    }
+
+    .action-row {
+      display: flex;
+      gap: 1rem;
+      justify-content: flex-end;
+    }
+
+    .btn-secondary {
+      background-color: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-main);
+    }
+
+    .btn-secondary:hover {
+      background-color: var(--border);
+    }
+
+    .status-msg {
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+      display: none;
+    }
+
+    .status-msg.error {
+      display: block;
+      background-color: rgba(239, 68, 68, 0.1);
+      border: 1px solid var(--error);
+      color: var(--error);
+    }
+
+    .status-msg.info {
+      display: block;
+      background-color: rgba(59, 130, 246, 0.1);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+    }
+
+    /* Loader */
+    .spinner {
+      display: inline-block;
+      width: 1rem;
+      height: 1rem;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 0.8s ease-in-out infinite;
+      margin-right: 0.5rem;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h1>Client-Side Media Extractor</h1>
+      <p>Extract maximum resolution Google Maps photos and parse social media assets entirely in your browser.</p>
+    </header>
+
+    <!-- SECTION 1: Google Maps High-Res Image Extractor -->
+    <section class="card">
+      <h2>📍 Google Maps High-Res Image Extractor</h2>
+      <p class="hint">
+        Paste a Google Maps image URL (e.g., from <code>googleusercontent.com</code> or right-clicked image address on Google Maps). 
+        The parser strips low-res size bounds like <code>=w203-h269-k-no</code> and forces maximum full-res output (<code>=s0</code>).
+      </p>
+
+      <div class="input-group">
+        <input type="url" id="gmaps-url" placeholder="https://lh5.googleusercontent.com/p/AF1QipN...=w203-h269-k-no" />
+        <button onclick="extractGmapsImage()">Extract High-Res</button>
+      </div>
+
+      <div id="gmaps-status" class="status-msg"></div>
+
+      <div id="gmaps-output" class="output-area">
+        <div class="preview-container">
+          <img id="gmaps-preview" src="" alt="Google Maps High-Res Preview" />
+        </div>
+        <div class="action-row">
+          <a id="gmaps-link" href="#" target="_blank" rel="noopener noreferrer">
+            <button>Open Full Image</button>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 2: Social Media Extractor -->
+    <section class="card">
+      <h2>🌐 Social Media Media Extractor</h2>
+      <p class="hint">
+        Supports YouTube, Instagram, TikTok, Twitter/X, and Snapchat URLs. Uses client-side embed logic and public APIs.
+      </p>
+
+      <div class="input-group">
+        <input type="url" id="social-url" placeholder="https://www.youtube.com/watch?v=... or TikTok/Instagram post link" />
+        <button onclick="extractSocialMedia()">Extract Media</button>
+      </div>
+
+      <div id="social-status" class="status-msg"></div>
+
+      <div id="social-output" class="output-area">
+        <div id="social-preview-wrapper" class="preview-container">
+          <!-- Dynamic Media Element Inserted Here -->
+        </div>
+        <div class="action-row" id="social-actions">
+          <!-- Dynamic Buttons Inserted Here -->
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    /**
+     * =========================================================================
+     * 1. GOOGLE MAPS CDN HIGH-RES PARSER LOGIC
+     * =========================================================================
+     */
+    function processGoogleCdnUrl(urlStr) {
+      try {
+        const url = new URL(urlStr);
+
+        /*
+         * REGEX BREAKDOWN FOR GOOGLE USER CONTENT CDN URLs:
+         * 
+         * Typical Google CDN image URLs look like:
+         * 1) https://lh5.googleusercontent.com/p/AF1Qip...=w203-h269-k-no
+         * 2) https://lh3.googleusercontent.com/gps-proxy/AL...=w400-h300
+         * 3) https://streetviewpixels-pa.googleapis.com/v1/thumbnail?panoid=...&w=400&h=300
+         *
+         * Google's image parameters use keys following the `=` sign.
+         * Common dimension locks: w[0-9]+ (width), h[0-9]+ (height), s[0-9]+ (square/max side), k-no (no crop).
+         * Replacing the modifier block with `=s0` forces the CDN to deliver the full original resolution.
+         */
+
+        if (url.hostname.includes('googleusercontent.com') || url.hostname.includes('ggpht.com')) {
+          // Case A: Parameter attached via '=' modifier string (e.g., =w203-h269-k-no)
+          if (url.pathname.includes('=')) {
+            url.pathname = url.pathname.replace(/=.*$/, '=s0');
+          } else if (url.search.includes('=')) {
+            // Sometimes parameters are in the query string (e.g., ?...=w203-h269)
+            url.search = url.search.replace(/=w\d+.*$/, '=s0');
+          } else {
+            // Append =s0 if no modifier exists
+            url.pathname += '=s0';
+          }
+          return url.toString();
+        } 
+        
+        if (url.hostname.includes('googleapis.com') && url.pathname.includes('thumbnail')) {
+          // Case B: StreetView / Maps PA API parameters (?w=400&h=300 -> max values)
+          url.searchParams.set('w', '4000');
+          url.searchParams.set('h', '4000');
+          return url.toString();
+        }
+
+        // Return original if no matched Google CDN signature found
+        return urlStr;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function extractGmapsImage() {
+      const input = document.getElementById('gmaps-url').value.trim();
+      const status = document.getElementById('gmaps-status');
+      const output = document.getElementById('gmaps-output');
+      const preview = document.getElementById('gmaps-preview');
+      const link = document.getElementById('gmaps-link');
+
+      // Reset UI
+      status.className = 'status-msg';
+      status.style.display = 'none';
+      output.classList.remove('active');
+
+      if (!input) {
+        showStatus(status, 'error', 'Please enter a valid Google Maps image URL.');
+        return;
+      }
+
+      const highResUrl = processGoogleCdnUrl(input);
+
+      if (!highResUrl) {
+        showStatus(status, 'error', 'Invalid URL structure.');
+        return;
+      }
+
+      // Display results
+      preview.src = highResUrl;
+      link.href = highResUrl;
+
+      // Check if image loads properly
+      preview.onload = () => {
+        output.classList.add('active');
+        showStatus(status, 'info', 'High-resolution image parameter successfully applied (=s0).');
+      };
+
+      preview.onerror = () => {
+        showStatus(status, 'error', 'Failed to load high-res image. The URL might be expired or protected.');
+      };
+    }
+
+    /**
+     * =========================================================================
+     * 2. SOCIAL MEDIA EXTRACTOR (CLIENT-SIDE STRATEGIES)
+     * =========================================================================
+     */
+    function extractSocialMedia() {
+      const input = document.getElementById('social-url').value.trim();
+      const status = document.getElementById('social-status');
+      const output = document.getElementById('social-output');
+      const container = document.getElementById('social-preview-wrapper');
+      const actions = document.getElementById('social-actions');
+
+      // Clear previous states
+      status.className = 'status-msg';
+      status.style.display = 'none';
+      output.classList.remove('active');
+      container.innerHTML = '';
+      actions.innerHTML = '';
+
+      if (!input) {
+        showStatus(status, 'error', 'Please enter a social media URL.');
+        return;
+      }
+
+      let parsedUrl;
+      try {
+        parsedUrl = new URL(input);
+      } catch (e) {
+        showStatus(status, 'error', 'Invalid URL format.');
+        return;
+      }
+
+      const host = parsedUrl.hostname.toLowerCase();
+
+      // --- YOUTUBE EXTRACTION ---
+      if (host.includes('youtube.com') || host.includes('youtu.be')) {
+        let videoId = null;
+        if (host.includes('youtu.be')) {
+          videoId = parsedUrl.pathname.slice(1);
+        } else if (parsedUrl.pathname.includes('/shorts/')) {
+          videoId = parsedUrl.pathname.split('/shorts/')[1];
+        } else {
+          videoId = parsedUrl.searchParams.get('v');
+        }
+
+        if (videoId) {
+          // YouTube provides accessible public max-res thumbnails directly via CDN
+          const maxResThumb = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+          const embedUrl = `https://www.youtube.com/embed/${videoId}`;
+
+          container.innerHTML = `
+            <iframe src="${embedUrl}" allowfullscreen></iframe>
+          `;
+
+          actions.innerHTML = `
+            <a href="${maxResThumb}" target="_blank" rel="noopener noreferrer">
+              <button class="btn-secondary">Download Max-Res Thumbnail</button>
+            </a>
+          `;
+          output.classList.add('active');
+          showStatus(status, 'info', 'YouTube Video & Thumbnail extracted successfully.');
+          return;
+        }
+      }
+
+      // --- INSTAGRAM EXTRACTION ---
+      if (host.includes('instagram.com')) {
+        // IG blocks direct media CORS fetching without backend auth.
+        // Client-side fallback: Official Embed Endpoint
+        const cleanPath = parsedUrl.pathname.replace(/\/$/, '');
+        const embedUrl = `https://www.instagram.com${cleanPath}/embed`;
+
+        container.innerHTML = `<iframe src="${embedUrl}" style="height:480px;"></iframe>`;
+        actions.innerHTML = `
+          <a href="${input}" target="_blank" rel="noopener noreferrer">
+            <button class="btn-secondary">Open Original Post</button>
+          </a>
+        `;
+        output.classList.add('active');
+        showStatus(status, 'info', 'Instagram player rendered via client embed fallback (CORS prevents direct raw binary download without a proxy backend).');
+        return;
+      }
+
+      // --- TIKTOK EXTRACTION ---
+      if (host.includes('tiktok.com')) {
+        // TikTok Embed player fallback
+        const videoIdMatch = input.match(/\/video\/(\d+)/);
+        if (videoIdMatch) {
+          const videoId = videoIdMatch[1];
+          container.innerHTML = `<iframe src="https://www.tiktok.com/embed/v2/${videoId}"></iframe>`;
+        } else {
+          container.innerHTML = `<p style="padding:1rem; text-align:center; color: var(--text-muted)">TikTok link detected. Direct media downloads require backend scraping bypasses. Use link below to view.</p>`;
+        }
+        
+        actions.innerHTML = `
+          <a href="${input}" target="_blank" rel="noopener noreferrer">
+            <button class="btn-secondary">Open on TikTok</button>
+          </a>
+        `;
+        output.classList.add('active');
+        showStatus(status, 'info', 'TikTok media extracted via iframe player fallback.');
+        return;
+      }
+
+      // --- TWITTER / X EXTRACTION ---
+      if (host.includes('twitter.com') || host.includes('x.com')) {
+        // Client-side fallback using Twitter/X Publish Embed API
+        const tweetIdMatch = input.match(/\/status\/(\d+)/);
+        if (tweetIdMatch) {
+          const tweetId = tweetIdMatch[1];
+          container.innerHTML = `
+            <iframe src="https://platform.twitter.com/embed/Tweet.html?id=${tweetId}" style="height:400px;"></iframe>
+          `;
+          actions.innerHTML = `
+            <a href="${input}" target="_blank" rel="noopener noreferrer">
+              <button class="btn-secondary">View Original Post</button>
+            </a>
+          `;
+          output.classList.add('active');
+          showStatus(status, 'info', 'X/Twitter post embedded successfully.');
+          return;
+        }
+      }
+
+      // --- SNAPCHAT EXTRACTION ---
+      if (host.includes('snapchat.com')) {
+        container.innerHTML = `<iframe src="${input}"></iframe>`;
+        actions.innerHTML = `
+          <a href="${input}" target="_blank" rel="noopener noreferrer">
+            <button class="btn-secondary">View on Snapchat</button>
+          </a>
+        `;
+        output.classList.add('active');
+        showStatus(status, 'info', 'Snapchat link loaded in client frame.');
+        return;
+      }
+
+      // Generic Fallback
+      showStatus(status, 'error', 'Unsupported platform or unparseable media URL structure.');
+    }
+
+    /**
+     * Helper to render status messages
+     */
+    function showStatus(element, type, message) {
+      element.className = `status-msg ${type}`;
+      element.textContent = message;
+    }
+  </script>
+</body>
+</html>
