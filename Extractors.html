@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Multi-Provider Media Extractor V 1.1</title>
+  <title>Multi-Provider Media Extractor V 1.2</title>
   <style>
     :root {
       --bg-color: #0f172a;
@@ -229,7 +229,7 @@
 
   <div class="main-wrapper">
     <header>
-      <h1 id="app-header-title">Multi-Provider Media Extractor V 1.1</h1>
+      <h1 id="app-header-title">Multi-Provider Media Extractor V 1.2</h1>
       <p>Separate extractors arranged side-by-side for photos and video streams.</p>
     </header>
 
@@ -347,8 +347,8 @@
   </div>
 
   <script>
-    /* Version Tracking - Strictly Incremented */
-    const APP_VERSION = "V 1.1";
+    /* Version Tracking - V 1.2 */
+    const APP_VERSION = "V 1.2";
     const APP_NAME = "Multi-Provider Media Extractor";
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -415,33 +415,36 @@
       el.textContent = message;
     }
 
-    /* ==========================================================================
-       1. GOOGLE MAPS (ENHANCED PHOTO KEY EXTRACTION ENGINE V 1.1)
-       ========================================================================== */
+    /* Helper: Key Extraction and Sanitization Engine */
+    function sanitizePhotoKey(rawKey) {
+      if (!rawKey) return null;
+      let clean = rawKey.split('!')[0].split('?')[0].split('=')[0].split('&')[0];
+      return clean.length >= 15 ? clean : null;
+    }
+
     function extractKeyFromString(str) {
       if (!str) return null;
       let decoded = str;
       try { decoded = decodeURIComponent(str); } catch(e) {}
-      
-      // Match AF1Qip keys
+
       const afMatch = decoded.match(/AF1Qip[A-Za-z0-9_-]{20,}/);
-      if (afMatch) return afMatch[0];
+      if (afMatch) return sanitizePhotoKey(afMatch[0]);
 
-      // Match CAAC keys
       const caacMatch = decoded.match(/CAAC[A-Za-z0-9_-]{20,}/);
-      if (caacMatch) return caacMatch[0];
+      if (caacMatch) return sanitizePhotoKey(caacMatch[0]);
 
-      // Match !1s parameter pattern
       const paramMatch = decoded.match(/!1s([A-Za-z0-9_-]{20,})/);
-      if (paramMatch) return paramMatch[1];
+      if (paramMatch) return sanitizePhotoKey(paramMatch[1]);
 
-      // Match /p/ CDN path key
       const cdnPathMatch = decoded.match(/\/p\/([A-Za-z0-9_-]{20,})/);
-      if (cdnPathMatch) return cdnPathMatch[1];
+      if (cdnPathMatch) return sanitizePhotoKey(cdnPathMatch[1]);
 
       return null;
     }
 
+    /* ==========================================================================
+       1. GOOGLE MAPS EXTRACTION ENGINE V 1.2
+       ========================================================================== */
     async function extractGmapsImage() {
       const inputRaw = document.getElementById('gmaps-url').value.trim();
       const statusId = 'gmaps-status';
@@ -459,42 +462,36 @@
 
       showStatus(statusId, 'info', 'Expanding link and parsing photo key...');
 
-      // Step 1: Client-side extraction directly from user input string
       let photoKey = extractKeyFromString(inputRaw);
 
-      // Step 2: Fetch via proxy and parse both final redirected URL and body
       if (!photoKey) {
         try {
           const res = await fetchWithCorsFallback(inputRaw);
-          
-          // Check final expanded redirect URL first (most reliable for short links)
           photoKey = extractKeyFromString(res.finalUrl);
-
-          // If still not found, check returned HTML content
           if (!photoKey && res.content) {
             const cleanContent = res.content.replace(/\\/g, '');
             photoKey = extractKeyFromString(cleanContent);
           }
         } catch (err) {
-          // Fallback parsing if fetch fails
+          // Fallback parsing
         }
       }
 
-      // Step 3: Construct guaranteed max-res CDN URL
       let finalHighResUrl = null;
 
       if (photoKey) {
-        finalHighResUrl = `https://lh3.googleusercontent.com/p/${photoKey}=s0`;
+        // Use =w2048-h2048 instead of =s0 to eliminate HTTP 400 Bad Request
+        finalHighResUrl = `https://lh3.googleusercontent.com/p/${photoKey}=w2048-h2048`;
       } else {
         const cdnDirectMatch = inputRaw.match(/https?:\/\/[^"'\s<>]*(?:googleusercontent\.com|ggpht\.com)\/[^"'\s<>]*/i);
         if (cdnDirectMatch) {
           const cleanBase = cdnDirectMatch[0].split('=')[0];
-          finalHighResUrl = `${cleanBase}=s0`;
+          finalHighResUrl = `${cleanBase}=w2048-h2048`;
         }
       }
 
       if (!finalHighResUrl) {
-        showStatus(statusId, 'error', 'Could not extract photo CDN. Please verify the URL points to a photo on Google Maps.');
+        showStatus(statusId, 'error', 'Could not extract photo CDN. Please verify the URL points directly to a photo on Google Maps.');
         return;
       }
 
@@ -511,14 +508,15 @@
       };
 
       preview.onerror = () => {
-        const fallbackUrl = finalHighResUrl.replace(/=s0$/, '');
+        // Fallback to base URL without parameters if CDN parameter fails
+        const fallbackUrl = finalHighResUrl.split('=')[0];
         preview.src = fallbackUrl;
         link.href = fallbackUrl;
         downloadBtn.onclick = () => {
           triggerDirectDownload(fallbackUrl, 'google-maps-photo.jpg');
         };
         output.classList.add('active');
-        showStatus(statusId, 'info', 'High-res image extracted via base CDN URL.');
+        showStatus(statusId, 'info', 'Extracted via direct base CDN URL.');
       };
     }
 
