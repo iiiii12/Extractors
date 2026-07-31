@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Multi-Provider Media Extractor V 2.5</title>
+  <title>Multi-Provider Media Extractor V 2.6</title>
   <style>
     :root {
       --bg-color: #0f172a;
@@ -229,7 +229,7 @@
 
   <div class="main-wrapper">
     <header>
-      <h1 id="app-header-title">Multi-Provider Media Extractor V 2.5</h1>
+      <h1 id="app-header-title">Multi-Provider Media Extractor V 2.6</h1>
       <p>Separate extractors arranged side-by-side for photos and video streams.</p>
     </header>
 
@@ -309,7 +309,7 @@
         </div>
       </section>
 
-      <!-- 5. TWITTER / X (CORS BLOB STREAM FIX) -->
+      <!-- 5. TWITTER / X (RAW CDN TARGET FIX FOR DOWNLOADS) -->
       <section class="card">
         <div>
           <h2>🐦 Twitter / X</h2>
@@ -347,8 +347,8 @@
   </div>
 
   <script>
-    /* Version Tracking - V 2.5 */
-    const APP_VERSION = "V 2.5";
+    /* Version Tracking - V 2.6 */
+    const APP_VERSION = "V 2.6";
     const APP_NAME = "Multi-Provider Media Extractor";
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -360,8 +360,32 @@
     /* Helper: Triggers download natively via Blob or Direct Anchor */
     async function triggerDirectDownload(fileUrl, filename) {
       try {
-        const response = await fetch(fileUrl, { mode: 'cors' });
-        const blob = await response.blob();
+        const streamProxies = [
+          `https://corsproxy.io/?${encodeURIComponent(fileUrl)}`,
+          `https://api.allorigins.win/raw?url=${encodeURIComponent(fileUrl)}`
+        ];
+
+        let blob = null;
+        for (const proxy of streamProxies) {
+          try {
+            const res = await fetch(proxy);
+            if (res.ok) {
+              const b = await res.blob();
+              if (b.size > 1000) {
+                blob = b;
+                break;
+              }
+            }
+          } catch (e) {
+            continue;
+          }
+        }
+
+        if (!blob) {
+          const directRes = await fetch(fileUrl, { mode: 'cors' });
+          blob = await directRes.blob();
+        }
+
         const blobUrl = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = blobUrl;
@@ -697,7 +721,7 @@
     }
 
     /* ==========================================================================
-       5. TWITTER / X EXTRACTION ENGINE (CORS BLOB STREAM FIX)
+       5. TWITTER / X EXTRACTION ENGINE (RAW CDN TARGET FIX FOR DOWNLOADS)
        ========================================================================== */
     async function extractTwitter() {
       const input = document.getElementById('twitter-url').value.trim();
@@ -776,9 +800,9 @@
           preview.innerHTML += `<img src="${m.url}" alt="Twitter Image" />`;
           actions.innerHTML += `<button onclick="triggerDirectDownload('${m.url}', 'twitter-photo-${idx+1}.jpg')">⬇️ Download Photo ${idx+1}</button> `;
         } else if (m.type === 'video' || m.type === 'gif') {
-          showStatus('twitter-status', 'info', 'Bypassing Twitter CDN embed restriction...');
+          showStatus('twitter-status', 'info', 'Loading Twitter video stream...');
 
-          // Stream through CORS proxy into a local Blob URL to fix blank player & download issues
+          // Stream through CORS proxy into a local Blob URL for in-page browser player
           let localBlobUrl = null;
           const streamProxies = [
             `https://corsproxy.io/?${encodeURIComponent(m.url)}`,
@@ -803,7 +827,9 @@
           const activeVideoSrc = localBlobUrl || m.url;
 
           preview.innerHTML += `<video controls autoplay playsinline src="${activeVideoSrc}" style="max-height:250px; width:100%;"></video>`;
-          actions.innerHTML += `<button onclick="triggerDirectDownload('${activeVideoSrc}', 'twitter-video.mp4')">⬇️ Download Video (MP4)</button> `;
+          
+          // CRITICAL FIX: Pass the raw HTTP CDN URL (m.url) to triggerDirectDownload, NOT activeVideoSrc (blob)
+          actions.innerHTML += `<button onclick="triggerDirectDownload('${m.url}', 'twitter-video.mp4')">⬇️ Download Video (MP4)</button> `;
           actions.innerHTML += `<a href="${m.url}" target="_blank" rel="noopener noreferrer"><button class="btn-secondary">🔗 Direct CDN Link</button></a> `;
         }
       }
