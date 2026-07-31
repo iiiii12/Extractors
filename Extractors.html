@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Client-Side Media & Google Maps Image Extractor 3</title>
+  <title>Client-Side Media & Google Maps Image Extractor</title>
   <style>
     :root {
       --bg-color: #0f172a;
@@ -15,6 +15,8 @@
       --border: #334155;
       --error: #ef4444;
       --success: #22c55e;
+      --badge-video: #8b5cf6;
+      --badge-image: #10b981;
     }
 
     * {
@@ -132,6 +134,28 @@
       display: block;
     }
 
+    .media-badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      margin-bottom: 0.75rem;
+      text-transform: uppercase;
+    }
+
+    .badge-video {
+      background-color: rgba(139, 92, 246, 0.2);
+      color: var(--badge-video);
+      border: 1px solid var(--badge-video);
+    }
+
+    .badge-image {
+      background-color: rgba(16, 185, 129, 0.2);
+      color: var(--badge-image);
+      border: 1px solid var(--badge-image);
+    }
+
     .preview-container {
       width: 100%;
       border-radius: 8px;
@@ -189,15 +213,15 @@
 
   <div class="container">
     <header>
-      <h1>Client-Side Media Extractor 3</h1>
-      <p>Extract direct full-res images and raw video streams directly in your browser.</p>
+      <h1>Client-Side Media Extractor 4</h1>
+      <p>Distinguish between photos and video streams with direct browser download logic.</p>
     </header>
 
     <!-- GOOGLE MAPS EXTRACTOR -->
     <section class="card">
       <h2>📍 Google Maps High-Res Image Extractor</h2>
       <p class="hint">
-        Paste any Google Maps URL (including place links like <code>google.com/maps/place/...</code> containing embedded media).
+        Paste any Google Maps place link containing an image or direct <code>googleusercontent.com</code> URL.
       </p>
 
       <div class="input-group">
@@ -212,7 +236,7 @@
           <img id="gmaps-preview" src="" alt="Google Maps High-Res Preview" />
         </div>
         <div class="action-row">
-          <button id="gmaps-download-btn">⬇️ Download Image File</button>
+          <button id="gmaps-download-btn">⬇️ Download High-Res Image</button>
           <a id="gmaps-link" href="#" target="_blank" rel="noopener noreferrer">
             <button class="btn-secondary">Open Direct CDN URL</button>
           </a>
@@ -222,19 +246,20 @@
 
     <!-- SOCIAL MEDIA EXTRACTOR -->
     <section class="card">
-      <h2>🌐 Social Media Extractor</h2>
+      <h2>🌐 Social Media Video & Image Extractor</h2>
       <p class="hint">
-        Extract raw media streams from YouTube, Snapchat (Spotlight), TikTok, X (Twitter), and Instagram.
+        Supports YouTube, Snapchat Spotlight, TikTok, X (Twitter), and Instagram links.
       </p>
 
       <div class="input-group">
-        <input type="text" id="social-url" placeholder="https://www.snapchat.com/@user/spotlight/... or X/TikTok link" />
+        <input type="text" id="social-url" placeholder="https://www.snapchat.com/@user/spotlight/... or TikTok/X video link" />
         <button onclick="extractSocialMedia()">Extract Media</button>
       </div>
 
       <div id="social-status" class="status-msg"></div>
 
       <div id="social-output" class="output-area">
+        <div id="media-type-badge"></div>
         <div id="social-preview-wrapper" class="preview-container"></div>
         <div class="action-row" id="social-actions"></div>
       </div>
@@ -242,6 +267,38 @@
   </div>
 
   <script>
+    /**
+     * Helper: Fetch URL content using dynamic CORS proxy fallback rotation
+     */
+    async function fetchWithCorsFallback(targetUrl) {
+      const proxies = [
+        url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+        url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+        url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
+      ];
+
+      for (let i = 0; i < proxies.length; i++) {
+        try {
+          const proxyUrl = proxies[i](targetUrl);
+          const response = await fetch(proxyUrl);
+          if (!response.ok) continue;
+
+          // Handle JSON wrapper vs direct string output
+          if (proxies[i].toString().includes('allorigins')) {
+            const data = await response.json();
+            if (data.contents) return data.contents;
+          } else {
+            const text = await response.text();
+            if (text && text.length > 100) return text;
+          }
+        } catch (e) {
+          // Try next proxy on error
+          continue;
+        }
+      }
+      throw new Error('All CORS proxies failed to retrieve this page content.');
+    }
+
     /**
      * Downloads files directly to local storage by fetching raw binary 
      * blobs and triggering an anchor save element.
@@ -259,7 +316,6 @@
         document.body.removeChild(a);
         URL.revokeObjectURL(blobUrl);
       } catch (err) {
-        // Fallback if direct blob fetch is restricted
         const a = document.createElement('a');
         a.href = fileUrl;
         a.download = filename;
@@ -299,13 +355,7 @@
       const cdnRegex = /(https?:\/\/[^"'\s=!#]+\.(?:googleusercontent|ggpht)\.com\/[^"'\s=!#]+(=[^"'\s!]*)?)/i;
       const match = decodedInput.match(cdnRegex);
 
-      let targetCdnUrl = null;
-
-      if (match) {
-        targetCdnUrl = match[1];
-      } else if (inputRaw.includes('googleusercontent.com') || inputRaw.includes('ggpht.com')) {
-        targetCdnUrl = inputRaw;
-      }
+      let targetCdnUrl = match ? match[1] : (inputRaw.includes('googleusercontent.com') ? inputRaw : null);
 
       if (!targetCdnUrl) {
         showStatus(status, 'error', 'Could not locate an embedded photo CDN link in this URL.');
@@ -331,7 +381,7 @@
 
       preview.onload = () => {
         output.classList.add('active');
-        showStatus(status, 'info', 'High-res image extracted successfully! Click "Download Image File" below.');
+        showStatus(status, 'info', 'High-res image extracted successfully! Click "Download High-Res Image" below.');
       };
 
       preview.onerror = () => {
@@ -355,11 +405,13 @@
       const output = document.getElementById('social-output');
       const container = document.getElementById('social-preview-wrapper');
       const actions = document.getElementById('social-actions');
+      const badge = document.getElementById('media-type-badge');
 
       status.style.display = 'none';
       output.classList.remove('active');
       container.innerHTML = '';
       actions.innerHTML = '';
+      badge.innerHTML = '';
 
       if (!input) {
         showStatus(status, 'error', 'Please enter a valid media URL.');
@@ -376,117 +428,73 @@
 
       const host = parsedUrl.hostname.toLowerCase();
 
-      // 1. YOUTUBE (MODIFIED TO CLEAN SHORTS/VIDEOS & FETCH ALL QUALITIES)
-      if (host.includes('youtube.com') || host.includes('youtu.be')) {
-        let videoId = null;
-
-        if (host.includes('youtu.be')) {
-          videoId = parsedUrl.pathname.slice(1).split('?')[0].split('/')[0];
-        } else if (parsedUrl.pathname.includes('/shorts/')) {
-          videoId = parsedUrl.pathname.split('/shorts/')[1].split('?')[0].split('/')[0];
-        } else {
-          videoId = parsedUrl.searchParams.get('v');
-        }
-
-        if (videoId) {
-          showStatus(status, 'info', 'Extracting YouTube media frame...');
-          const maxThumb = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
-          const hqThumb = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-
-          container.innerHTML = `<img id="yt-thumb-img" src="${maxThumb}" alt="YouTube Cover" />`;
-          
-          // Test thumbnail availability (maxres vs hq)
-          const imgTest = document.getElementById('yt-thumb-img');
-          imgTest.onerror = () => {
-            imgTest.src = hqThumb;
-          };
-
-          actions.innerHTML = `
-            <button onclick="triggerDirectDownload('${maxThumb}', 'youtube-cover-${videoId}.jpg')">⬇️ Download Max-Res Cover</button>
-            <a href="https://www.youtube.com/watch?v=${videoId}" target="_blank"><button class="btn-secondary">Open Video</button></a>
-          `;
-          output.classList.add('active');
-          showStatus(status, 'info', 'YouTube cover frame extracted successfully.');
-          return;
-        } else {
-          showStatus(status, 'error', 'Could not parse video ID from YouTube URL.');
-          return;
-        }
-      }
-
-      // 2. SNAPCHAT (PARSES DIRECT .SC-CDN.NET MP4 VIDEO STREAMS VIA ALLORIGINS CORS BRIDGE)
+      // 1. SNAPCHAT SPOTLIGHT (DIRECT VIDEO EXTRACTION)
       if (host.includes('snapchat.com')) {
-        showStatus(status, 'info', 'Bypassing Snapchat restrictions & fetching raw video CDN stream...');
+        showStatus(status, 'info', 'Fetching Snapchat video stream across proxy rotators...');
         try {
-          const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(input)}`;
-          const response = await fetch(proxyUrl);
-          const data = await response.json();
-          const htmlText = data.contents;
+          const htmlText = await fetchWithCorsFallback(input);
 
-          // Extract direct sc-cdn MP4 video URL from meta tags or page payloads
+          // Locate direct .sc-cdn.net video URL pattern
           const videoMatch = htmlText.match(/(https?:\/\/[^"'\s]+\.sc-cdn\.net\/[^"'\s>]+)/i);
 
           if (videoMatch) {
-            // Clean escaped slashes if present
             let rawVideoUrl = videoMatch[1].replace(/\\/g, '');
-            // Decode HTML entities (e.g. &amp; -> &)
             const txt = document.createElement('textarea');
             txt.innerHTML = rawVideoUrl;
             rawVideoUrl = txt.value;
 
-            container.innerHTML = `
-              <video controls src="${rawVideoUrl}" style="max-width:100%; max-height:450px;"></video>
-            `;
+            badge.innerHTML = `<span class="media-badge badge-video">📹 Detected: Snapchat Video</span>`;
+            container.innerHTML = `<video controls src="${rawVideoUrl}" style="max-width:100%; max-height:450px;"></video>`;
 
             actions.innerHTML = `
-              <button onclick="triggerDirectDownload('${rawVideoUrl}', 'snapchat-spotlight-video.mp4')">⬇️ Download Video (MP4)</button>
-              <a href="${rawVideoUrl}" target="_blank"><button class="btn-secondary">Open Direct Stream</button></a>
+              <button onclick="triggerDirectDownload('${rawVideoUrl}', 'snapchat-video.mp4')">⬇️ Download Video (MP4)</button>
+              <a href="${rawVideoUrl}" target="_blank"><button class="btn-secondary">Open Raw Video</button></a>
             `;
             output.classList.add('active');
-            showStatus(status, 'info', 'Direct Snapchat Spotlight MP4 video stream extracted!');
+            showStatus(status, 'info', 'Snapchat video stream extracted successfully!');
             return;
           } else {
-            throw new Error('No .sc-cdn.net video payload found in page source.');
+            throw new Error('No .sc-cdn video binary found in page payload.');
           }
         } catch (err) {
-          showStatus(status, 'error', 'Failed to extract direct video stream. ' + err.message);
+          showStatus(status, 'error', 'Failed to extract Snapchat video: ' + err.message);
           return;
         }
       }
 
-      // 3. X / TWITTER (DIRECT MEDIA & VIDEO EXTRACTION VIA SYNDICATION API)
+      // 2. X / TWITTER (PHOTO VS VIDEO DISCRIMINATION)
       if (host.includes('twitter.com') || host.includes('x.com')) {
         const tweetIdMatch = input.match(/\/status\/(\d+)/);
         if (!tweetIdMatch) {
-          showStatus(status, 'error', 'Invalid X/Twitter status URL format.');
+          showStatus(status, 'error', 'Invalid Twitter/X status link format.');
           return;
         }
 
         const tweetId = tweetIdMatch[1];
-        showStatus(status, 'info', 'Fetching X (Twitter) post media directly...');
+        showStatus(status, 'info', 'Querying Twitter Syndication API...');
 
         try {
           const synRes = await fetch(`https://cdn.syndication.twimg.com/tweet-result?id=${tweetId}&token=x`);
           const tweetData = await synRes.json();
 
-          let mediaFound = false;
-          container.innerHTML = '';
-          actions.innerHTML = '';
+          if (tweetData.mediaDetails && tweetData.mediaDetails.length > 0) {
+            const hasVideo = tweetData.mediaDetails.some(m => m.type === 'video' || m.type === 'animated_gif');
 
-          // Extract photos
-          if (tweetData.mediaDetails) {
+            if (hasVideo) {
+              badge.innerHTML = `<span class="media-badge badge-video">📹 Detected: Twitter Video</span>`;
+            } else {
+              badge.innerHTML = `<span class="media-badge badge-image">🖼️ Detected: Twitter Photo(s)</span>`;
+            }
+
             tweetData.mediaDetails.forEach((media, idx) => {
               if (media.type === 'photo') {
-                mediaFound = true;
                 const photoUrl = `${media.media_url_https}?format=jpg&name=orig`;
-                container.innerHTML += `<img src="${photoUrl}" alt="Tweet Image ${idx + 1}" />`;
-                actions.innerHTML += `<button onclick="triggerDirectDownload('${photoUrl}', 'twitter-image-${tweetId}-${idx + 1}.jpg')">⬇️ Download Photo ${idx + 1}</button> `;
+                container.innerHTML += `<img src="${photoUrl}" alt="Photo ${idx + 1}" />`;
+                actions.innerHTML += `<button onclick="triggerDirectDownload('${photoUrl}', 'twitter-photo-${tweetId}-${idx + 1}.jpg')">⬇️ Download Photo ${idx + 1}</button> `;
               } else if (media.type === 'video' || media.type === 'animated_gif') {
-                mediaFound = true;
-                // Grab the highest bitrate MP4 variant
                 const variants = media.video_info.variants.filter(v => v.content_type === 'video/mp4');
                 variants.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
-                
+
                 if (variants.length > 0) {
                   const bestVideoUrl = variants[0].url;
                   container.innerHTML += `<video controls src="${bestVideoUrl}"></video>`;
@@ -494,48 +502,87 @@
                 }
               }
             });
-          }
 
-          if (mediaFound) {
-            actions.innerHTML += `<a href="${input}" target="_blank"><button class="btn-secondary">Open Original Post</button></a>`;
+            actions.innerHTML += `<a href="${input}" target="_blank"><button class="btn-secondary">Open Post</button></a>`;
             output.classList.add('active');
-            showStatus(status, 'info', 'X (Twitter) media extracted successfully!');
+            showStatus(status, 'info', 'Twitter/X media extracted successfully!');
             return;
           } else {
-            showStatus(status, 'error', 'No media assets (images or videos) found in this tweet.');
+            showStatus(status, 'error', 'No media attachments found in this tweet.');
             return;
           }
         } catch (e) {
-          showStatus(status, 'error', 'Failed to parse X/Twitter media. The post might be private or deleted.');
+          showStatus(status, 'error', 'Unable to parse Twitter post media.');
           return;
         }
       }
 
-      // 4. TIKTOK (FETCHES PUBLIC METADATA & COVER FRAMES WITH DOWNLOAD)
+      // 3. TIKTOK (EXTRACTS REAL MP4 VIDEO FILE BINARY)
       if (host.includes('tiktok.com')) {
-        showStatus(status, 'info', 'Fetching TikTok media metadata...');
+        showStatus(status, 'info', 'Extracting TikTok video stream...');
         try {
-          const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(input)}`;
-          const res = await fetch(oembedUrl);
-          const data = await res.json();
+          const htmlText = await fetchWithCorsFallback(input);
 
-          if (data.thumbnail_url) {
-            container.innerHTML = `
-              <p style="color:var(--text-muted); font-size:0.9rem;"><strong>${data.title || 'TikTok Post'}</strong> by ${data.author_name}</p>
-              <img src="${data.thumbnail_url}" alt="TikTok Cover" />
-            `;
+          // Look for direct MP4 stream links embedded in TikTok's JSON payload
+          const mp4Match = htmlText.match(/https?:\/\/[^"'\s]+\.tiktokcdn\.com\/[^"'\s]+\.mp4[^"'\s]*/i) || 
+                           htmlText.match(/\"playAddr\":\"(https?:\\\/\\\/[^"]+)\"/i);
+
+          if (mp4Match) {
+            let directMp4 = mp4Match[1] || mp4Match[0];
+            directMp4 = directMp4.replace(/\\/g, '');
+
+            badge.innerHTML = `<span class="media-badge badge-video">📹 Detected: TikTok Video</span>`;
+            container.innerHTML = `<video controls src="${directMp4}" style="max-width:100%; max-height:450px;"></video>`;
             actions.innerHTML = `
-              <button onclick="triggerDirectDownload('${data.thumbnail_url}', 'tiktok-cover.jpg')">⬇️ Download Cover Frame</button>
-              <a href="${input}" target="_blank"><button class="btn-secondary">Open on TikTok</button></a>
+              <button onclick="triggerDirectDownload('${directMp4}', 'tiktok-video.mp4')">⬇️ Download Video (MP4)</button>
+              <a href="${input}" target="_blank"><button class="btn-secondary">Open Post</button></a>
             `;
             output.classList.add('active');
-            showStatus(status, 'info', 'TikTok post parsed successfully.');
+            showStatus(status, 'info', 'TikTok video stream extracted successfully!');
             return;
           } else {
-            throw new Error('No thumbnail data returned.');
+            // Fallback to cover preview if raw MP4 stream is protected by token signature
+            const oembedRes = await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(input)}`);
+            const data = await oembedRes.json();
+            badge.innerHTML = `<span class="media-badge badge-video">📹 Detected: TikTok Video (Cover Preview)</span>`;
+            container.innerHTML = `<img src="${data.thumbnail_url}" alt="TikTok Cover" />`;
+            actions.innerHTML = `
+              <button onclick="triggerDirectDownload('${data.thumbnail_url}', 'tiktok-cover.jpg')">⬇️ Download Cover Frame</button>
+              <a href="${input}" target="_blank"><button class="btn-secondary">Open Original Video</button></a>
+            `;
+            output.classList.add('active');
+            showStatus(status, 'info', 'TikTok cover extracted (Direct video stream requires server authentication).');
+            return;
           }
         } catch (e) {
-          showStatus(status, 'error', 'Could not parse TikTok link.');
+          showStatus(status, 'error', 'Could not parse TikTok video stream.');
+          return;
+        }
+      }
+
+      // 4. YOUTUBE (DISTINGUISHES COVER vs YOUTUBE VIDEO DOWNLOADER BRIDGE)
+      if (host.includes('youtube.com') || host.includes('youtu.be')) {
+        let videoId = host.includes('youtu.be') ? parsedUrl.pathname.slice(1).split('?')[0] : parsedUrl.searchParams.get('v');
+        if (parsedUrl.pathname.includes('/shorts/')) {
+          videoId = parsedUrl.pathname.split('/shorts/')[1].split('?')[0];
+        }
+
+        if (videoId) {
+          badge.innerHTML = `<span class="media-badge badge-video">📹 Detected: YouTube Video</span>`;
+          const maxThumb = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+
+          container.innerHTML = `
+            <iframe src="https://www.youtube.com/embed/${videoId}" style="width:100%; height:350px; border:none; border-radius:8px;"></iframe>
+          `;
+
+          actions.innerHTML = `
+            <button onclick="triggerDirectDownload('${maxThumb}', 'youtube-cover-${videoId}.jpg')">⬇️ Download High-Res Cover</button>
+            <a href="https://y2mate.is/v10/analyze?url=https://www.youtube.com/watch?v=${videoId}" target="_blank">
+              <button class="btn-secondary">⬇️ Download Full Video (MP4)</button>
+            </a>
+          `;
+          output.classList.add('active');
+          showStatus(status, 'info', 'YouTube video player & thumbnail extracted.');
           return;
         }
       }
