@@ -230,13 +230,13 @@
 
   <div class="main-wrapper">
     <header>
-      <h1>Multi-Provider Media Extractor 6</h1>
+      <h1>Multi-Provider Media Extractor 7</h1>
       <p>Separate extractors arranged side-by-side for photos and video streams.</p>
     </header>
 
     <div class="grid-container">
 
-      <!-- 1. GOOGLE MAPS (REVERTED TO WORKING ORIGINAL LOGIC) -->
+      <!-- 1. GOOGLE MAPS (HANDLES BOTH LONG & SHORT URLs) -->
       <section class="card">
         <div>
           <h2>📍 Google Maps</h2>
@@ -407,9 +407,9 @@
     }
 
     /* ==========================================================================
-       1. GOOGLE MAPS (ORIGINAL WORKING LOGIC RESTORED)
+       1. GOOGLE MAPS (UPDATED: SUPPORTS BOTH LONG & SHORT URLs)
        ========================================================================== */
-    function extractGmapsImage() {
+    async function extractGmapsImage() {
       const inputRaw = document.getElementById('gmaps-url').value.trim();
       const statusId = 'gmaps-status';
       const output = document.getElementById('gmaps-output');
@@ -424,6 +424,11 @@
         return;
       }
 
+      showStatus(statusId, 'info', 'Expanding URL and extracting image...');
+
+      const cdnRegex = /(https?:\/\/[^"'\s=!#]+\.(?:googleusercontent|ggpht)\.com\/[^"'\s=!#]+(=[^"'\s!]*)?)/i;
+      let targetCdnUrl = null;
+
       let decodedInput = inputRaw;
       try {
         decodedInput = decodeURIComponent(inputRaw);
@@ -431,10 +436,30 @@
         decodedInput = inputRaw;
       }
 
-      const cdnRegex = /(https?:\/\/[^"'\s=!#]+\.(?:googleusercontent|ggpht)\.com\/[^"'\s=!#]+(=[^"'\s!]*)?)/i;
-      const match = decodedInput.match(cdnRegex);
-
-      let targetCdnUrl = match ? match[1] : (inputRaw.includes('googleusercontent.com') ? inputRaw : null);
+      // Check 1: Direct match in URL text
+      const directMatch = decodedInput.match(cdnRegex);
+      if (directMatch) {
+        targetCdnUrl = directMatch[1];
+      } else if (inputRaw.includes('googleusercontent.com') || inputRaw.includes('ggpht.com')) {
+        targetCdnUrl = inputRaw;
+      } else {
+        // Check 2: Shortened URL (e.g. maps.app.goo.gl) - Fetch resolved HTML
+        try {
+          const htmlText = await fetchWithCorsFallback(inputRaw);
+          const htmlMatch = htmlText.match(cdnRegex);
+          if (htmlMatch) {
+            targetCdnUrl = htmlMatch[1];
+          } else {
+            const ogMatch = htmlText.match(/<meta\s+property="og:image"\s+content="([^"]+)"/i);
+            if (ogMatch && (ogMatch[1].includes('googleusercontent') || ogMatch[1].includes('ggpht'))) {
+              targetCdnUrl = ogMatch[1];
+            }
+          }
+        } catch (err) {
+          showStatus(statusId, 'error', 'Failed to expand short URL: ' + err.message);
+          return;
+        }
+      }
 
       if (!targetCdnUrl) {
         showStatus(statusId, 'error', 'Could not locate an embedded photo CDN link in this URL.');
