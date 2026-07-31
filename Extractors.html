@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Multi-Provider Media Extractor V 2.8</title>
+  <title>Multi-Provider Media Extractor V 2.9</title>
   <style>
     :root {
       --bg-color: #0f172a;
@@ -229,7 +229,7 @@
 
   <div class="main-wrapper">
     <header>
-      <h1 id="app-header-title">Multi-Provider Media Extractor V 2.8</h1>
+      <h1 id="app-header-title">Multi-Provider Media Extractor V 2.9</h1>
       <p>Separate extractors arranged side-by-side for photos and video streams.</p>
     </header>
 
@@ -347,7 +347,7 @@
   </div>
 
   <script>
-    const APP_VERSION = "V 2.8";
+    const APP_VERSION = "V 2.9";
     const APP_NAME = "Multi-Provider Media Extractor";
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -356,10 +356,10 @@
       if (headerEl) headerEl.textContent = `${APP_NAME} ${APP_VERSION}`;
     });
 
-    /* Robust Download Utility bypassing 403 blocks */
+    /* Robust Download Utility using AllOrigins Proxy to avoid 403 blocks */
     async function triggerDirectDownload(fileUrl, filename) {
       try {
-        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(fileUrl)}`;
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(fileUrl)}`;
         const res = await fetch(proxyUrl);
         if (!res.ok) throw new Error('Proxy fetch failed');
         
@@ -377,8 +377,8 @@
         document.body.removeChild(a);
         setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
       } catch (err) {
-        // Fallback: Open clean proxy window directly if blob restriction triggers
-        window.open(`https://corsproxy.io/?${encodeURIComponent(fileUrl)}`, '_blank');
+        // Fallback: Open proxy window directly if blob download fails
+        window.open(`https://api.allorigins.win/raw?url=${encodeURIComponent(fileUrl)}`, '_blank');
       }
     }
 
@@ -404,7 +404,6 @@
     async function resolveShortUrl(targetUrl) {
       const endpoints = [
         `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`,
-        `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
         `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`
       ];
 
@@ -580,7 +579,6 @@
       showStatus('snapchat-status', 'info', 'Fetching Snapchat Spotlight stream...');
 
       const proxyEndpoints = [
-        `https://corsproxy.io/?${encodeURIComponent(input)}`,
         `https://api.allorigins.win/raw?url=${encodeURIComponent(input)}`,
         `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(input)}`
       ];
@@ -654,7 +652,7 @@
       showStatus('snapchat-status', 'info', 'Snapchat video stream loaded successfully!');
     }
 
-    /* 5. TWITTER / X (FIXED 403 CDN BLOCKS) */
+    /* 5. TWITTER / X (FIXED WITH ALLORIGINS PROXY) */
     async function extractTwitter() {
       const input = document.getElementById('twitter-url').value.trim();
       const output = document.getElementById('twitter-output');
@@ -726,8 +724,8 @@
       for (let idx = 0; idx < mediaList.length; idx++) {
         const m = mediaList[idx];
         
-        // Route video player and download links through proxy/fx domain to prevent 403 errors
-        const safeStreamUrl = m.url.includes('video.twimg.com') ? `https://corsproxy.io/?${encodeURIComponent(m.url)}` : m.url;
+        // Route video player stream through AllOrigins proxy to avoid 403 blocks
+        const safeStreamUrl = m.url.includes('video.twimg.com') ? `https://api.allorigins.win/raw?url=${encodeURIComponent(m.url)}` : m.url;
 
         if (m.type === 'image' || m.type === 'photo') {
           preview.innerHTML += `<img src="${m.url}" alt="Twitter Image" />`;
