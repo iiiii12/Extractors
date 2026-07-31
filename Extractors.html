@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Multi-Provider Media Extractor V 1.4</title>
+  <title>Multi-Provider Media Extractor V 1.5</title>
   <style>
     :root {
       --bg-color: #0f172a;
@@ -229,7 +229,7 @@
 
   <div class="main-wrapper">
     <header>
-      <h1 id="app-header-title">Multi-Provider Media Extractor V 1.4</h1>
+      <h1 id="app-header-title">Multi-Provider Media Extractor V 1.5</h1>
       <p>Separate extractors arranged side-by-side for photos and video streams.</p>
     </header>
 
@@ -347,8 +347,8 @@
   </div>
 
   <script>
-    /* Version Tracking - V 1.4 */
-    const APP_VERSION = "V 1.4";
+    /* Version Tracking - V 1.5 */
+    const APP_VERSION = "V 1.5";
     const APP_NAME = "Multi-Provider Media Extractor";
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -387,39 +387,6 @@
       el.textContent = message;
     }
 
-    /* Helper: Multi-Tier CORS Proxy Engine for Short URLs */
-    async function fetchWithMultiProxyFallback(targetUrl) {
-      const proxies = [
-        url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
-        url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-        url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-        url => `https://thingproxy.freeboard.io/fetch/${encodeURIComponent(url)}`
-      ];
-
-      for (let i = 0; i < proxies.length; i++) {
-        try {
-          const proxyUrl = proxies[i](targetUrl);
-          const response = await fetch(proxyUrl);
-          if (!response.ok) continue;
-
-          if (proxies[i].toString().includes('allorigins')) {
-            const data = await response.json();
-            if (data.contents || data.status?.url) {
-              return { content: data.contents || '', finalUrl: data.status?.url || targetUrl };
-            }
-          } else {
-            const text = await response.text();
-            if (text && text.length > 50) {
-              return { content: text, finalUrl: response.url || targetUrl };
-            }
-          }
-        } catch (e) {
-          continue; // Try next proxy on failure
-        }
-      }
-      throw new Error('All CORS proxies failed to resolve short URL.');
-    }
-
     /* Exact matching logic for normal URLs - UNTOUCHED */
     function parseGmapsUrl(str) {
       try {
@@ -434,8 +401,37 @@
       return null;
     }
 
+    /* Robust Short Link Expansion Engine V 1.5 */
+    async function resolveShortUrl(targetUrl) {
+      const endpoints = [
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
+        `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
+        `https://wrapper.api.urlmeta.org/?url=${encodeURIComponent(targetUrl)}`
+      ];
+
+      for (const endpoint of endpoints) {
+        try {
+          const res = await fetch(endpoint);
+          if (!res.ok) continue;
+
+          const text = await res.text();
+          const match = parseGmapsUrl(text);
+          if (match) return match;
+
+          // Search un-escaped HTML quotes
+          const rawMatch = text.match(/lh3\.googleusercontent\.com\/[^\s"'<>=]+/);
+          if (rawMatch && rawMatch[0]) {
+            return `https://${rawMatch[0]}=w2048`;
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+      return null;
+    }
+
     /* ==========================================================================
-       1. GOOGLE MAPS EXTRACTION ENGINE V 1.4
+       1. GOOGLE MAPS EXTRACTION ENGINE V 1.5
        ========================================================================== */
     async function extractGmapsImage() {
       const inputRaw = document.getElementById('gmaps-url').value.trim();
@@ -452,30 +448,22 @@
         return;
       }
 
-      // Step 1: Try direct extraction first (Fast path for long URLs - UNTOUCHED)
+      // Step 1: Fast path for long URLs - STRICTLY UNTOUCHED
       let highResUrl = parseGmapsUrl(inputRaw);
 
-      // Step 2: If direct extraction failed, expand short URL via multi-proxy fallback
+      // Step 2: Short URL path - Resolves maps.app.goo.gl and g.co links
       if (!highResUrl) {
         showStatus(statusId, 'info', 'Expanding short link...');
         try {
-          const proxyRes = await fetchWithMultiProxyFallback(inputRaw);
-
-          // Check expanded target URL string
-          highResUrl = parseGmapsUrl(proxyRes.finalUrl);
-
-          // Check raw page HTML content if target URL alone didn't contain full image link
-          if (!highResUrl && proxyRes.content) {
-            highResUrl = parseGmapsUrl(proxyRes.content);
-          }
+          highResUrl = await resolveShortUrl(inputRaw);
         } catch (err) {
-          showStatus(statusId, 'error', 'Could not expand short URL. Please verify your connection or try again.');
+          showStatus(statusId, 'error', 'Could not expand short link automatically.');
           return;
         }
       }
 
       if (!highResUrl) {
-        showStatus(statusId, 'error', 'No valid Google image link found in this URL.');
+        showStatus(statusId, 'error', 'No valid Google image link found. Please verify the link.');
         return;
       }
 
@@ -555,8 +543,9 @@
       showStatus('tiktok-status', 'info', 'Fetching video stream...');
 
       try {
-        const res = await fetchWithMultiProxyFallback(input);
-        const htmlText = res.content;
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(input)}`;
+        const res = await fetch(proxyUrl);
+        const htmlText = await res.text();
 
         const mp4Match = htmlText.match(/https?:\/\/[^"'\s]+\.tiktokcdn\.com\/[^"'\s]+\.mp4[^"'\s]*/i) || 
                          htmlText.match(/\"playAddr\":\"(https?:\\\/\\\/[^"]+)\"/i);
@@ -595,8 +584,9 @@
       showStatus('snapchat-status', 'info', 'Fetching video stream...');
 
       try {
-        const res = await fetchWithMultiProxyFallback(input);
-        const htmlText = res.content;
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(input)}`;
+        const res = await fetch(proxyUrl);
+        const htmlText = await res.text();
 
         const videoMatch = htmlText.match(/<meta\s+property="og:video"\s+content="([^"]+)"/i) ||
                            htmlText.match(/(https?:\/\/[^"'\s]+\.sc-cdn\.net\/[^"'\s>]+\.mp4[^"'\s]*)/i) ||
@@ -690,8 +680,9 @@
         let ddUrl = input.replace('instagram.com', 'ddinstagram.com');
         if (!ddUrl.endsWith('/')) ddUrl += '/';
 
-        const res = await fetchWithMultiProxyFallback(ddUrl);
-        const htmlText = res.content;
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(ddUrl)}`;
+        const res = await fetch(proxyUrl);
+        const htmlText = await res.text();
 
         const vidMatch = htmlText.match(/<meta\s+property="og:video"\s+content="([^"]+)"/i);
         const imgMatch = htmlText.match(/<meta\s+property="og:image"\s+content="([^"]+)"/i);
