@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Multi-Provider Media Extractor V 1.6</title>
+  <title>Multi-Provider Media Extractor V 1.7</title>
   <style>
     :root {
       --bg-color: #0f172a;
@@ -229,13 +229,13 @@
 
   <div class="main-wrapper">
     <header>
-      <h1 id="app-header-title">Multi-Provider Media Extractor V 1.6</h1>
+      <h1 id="app-header-title">Multi-Provider Media Extractor V 1.7</h1>
       <p>Separate extractors arranged side-by-side for photos and video streams.</p>
     </header>
 
     <div class="grid-container">
 
-      <!-- 1. GOOGLE MAPS -->
+      <!-- 1. GOOGLE MAPS (STRICTLY UNTOUCHED) -->
       <section class="card">
         <div>
           <h2>📍 Google Maps</h2>
@@ -258,7 +258,7 @@
         </div>
       </section>
 
-      <!-- 2. YOUTUBE -->
+      <!-- 2. YOUTUBE (UPDATED DOWNLOAD BRIDGE) -->
       <section class="card">
         <div>
           <h2>▶️ YouTube</h2>
@@ -347,8 +347,8 @@
   </div>
 
   <script>
-    /* Version Tracking - V 1.6 */
-    const APP_VERSION = "V 1.6";
+    /* Version Tracking - V 1.7 */
+    const APP_VERSION = "V 1.7";
     const APP_NAME = "Multi-Provider Media Extractor";
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -401,7 +401,7 @@
       return null;
     }
 
-    /* Enhanced Short Link Resolver V 1.6 (Supports Photo IDs & Legacy Links) */
+    /* Enhanced Short Link Resolver - STRICTLY UNTOUCHED */
     async function resolveShortUrl(targetUrl) {
       const endpoints = [
         `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`,
@@ -445,7 +445,7 @@
     }
 
     /* ==========================================================================
-       1. GOOGLE MAPS EXTRACTION ENGINE V 1.6
+       1. GOOGLE MAPS EXTRACTION ENGINE - STRICTLY UNTOUCHED
        ========================================================================== */
     async function extractGmapsImage() {
       const inputRaw = document.getElementById('gmaps-url').value.trim();
@@ -500,7 +500,7 @@
     }
 
     /* ==========================================================================
-       2. YOUTUBE EXTRACTION
+       2. YOUTUBE EXTRACTION ENGINE V 1.7 (FIXED DOWNLOAD BRIDGE)
        ========================================================================== */
     function extractYouTube() {
       const input = document.getElementById('youtube-url').value.trim();
@@ -530,12 +530,17 @@
       if (!vidId) return showStatus('youtube-status', 'error', 'Could not parse YouTube Video ID.');
 
       const thumbUrl = `https://img.youtube.com/vi/${vidId}/maxresdefault.jpg`;
+      const directDownloadBridge = `https://y2mate.is/en/youtube-to-mp4/${vidId}`;
+      const apiButtonIframe = `https://api.vevioz.com/api/button/mp4/${vidId}`;
 
-      preview.innerHTML = `<iframe src="https://www.youtube.com/embed/${vidId}" style="width:100%; height:220px; border:none; border-radius:6px;"></iframe>`;
+      preview.innerHTML = `
+        <iframe src="https://www.youtube.com/embed/${vidId}" style="width:100%; height:200px; border:none; border-radius:6px;"></iframe>
+        <iframe src="${apiButtonIframe}" style="width:100%; height:60px; border:none; overflow:hidden;" scrolling="no"></iframe>
+      `;
 
       actions.innerHTML = `
         <button onclick="triggerDirectDownload('${thumbUrl}', 'youtube-cover.jpg')">🖼️ Download Cover Image</button>
-        <a href="https://cobalt.tools" target="_blank"><button class="btn-secondary">⬇️ Download Video (MP4)</button></a>
+        <a href="${directDownloadBridge}" target="_blank"><button class="btn-secondary">⬇️ Download MP4 (External Bridge)</button></a>
       `;
 
       output.classList.add('active');
