@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Multi-Provider Media Extractor V 2.6</title>
+  <title>Multi-Provider Media Extractor V 2.7</title>
   <style>
     :root {
       --bg-color: #0f172a;
@@ -229,13 +229,13 @@
 
   <div class="main-wrapper">
     <header>
-      <h1 id="app-header-title">Multi-Provider Media Extractor V 2.6</h1>
+      <h1 id="app-header-title">Multi-Provider Media Extractor V 2.7</h1>
       <p>Separate extractors arranged side-by-side for photos and video streams.</p>
     </header>
 
     <div class="grid-container">
 
-      <!-- 1. GOOGLE MAPS (STRICTLY UNTOUCHED) -->
+      <!-- 1. GOOGLE MAPS -->
       <section class="card">
         <div>
           <h2>📍 Google Maps</h2>
@@ -258,7 +258,7 @@
         </div>
       </section>
 
-      <!-- 2. YOUTUBE (STRICTLY UNTOUCHED) -->
+      <!-- 2. YOUTUBE -->
       <section class="card">
         <div>
           <h2>▶️ YouTube</h2>
@@ -275,7 +275,7 @@
         </div>
       </section>
 
-      <!-- 3. TIKTOK (STRICTLY UNTOUCHED) -->
+      <!-- 3. TIKTOK -->
       <section class="card">
         <div>
           <h2>🎵 TikTok</h2>
@@ -292,7 +292,7 @@
         </div>
       </section>
 
-      <!-- 4. SNAPCHAT (STRICTLY UNTOUCHED) -->
+      <!-- 4. SNAPCHAT -->
       <section class="card">
         <div>
           <h2>👻 Snapchat</h2>
@@ -309,7 +309,7 @@
         </div>
       </section>
 
-      <!-- 5. TWITTER / X (RAW CDN TARGET FIX FOR DOWNLOADS) -->
+      <!-- 5. TWITTER / X -->
       <section class="card">
         <div>
           <h2>🐦 Twitter / X</h2>
@@ -347,8 +347,7 @@
   </div>
 
   <script>
-    /* Version Tracking - V 2.6 */
-    const APP_VERSION = "V 2.6";
+    const APP_VERSION = "V 2.7";
     const APP_NAME = "Multi-Provider Media Extractor";
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -357,51 +356,65 @@
       if (headerEl) headerEl.textContent = `${APP_NAME} ${APP_VERSION}`;
     });
 
-    /* Helper: Triggers download natively via Blob or Direct Anchor */
+    /* Strict Binary Download Helper with MIME validation */
     async function triggerDirectDownload(fileUrl, filename) {
       try {
-        const streamProxies = [
-          `https://corsproxy.io/?${encodeURIComponent(fileUrl)}`,
-          `https://api.allorigins.win/raw?url=${encodeURIComponent(fileUrl)}`
-        ];
-
         let blob = null;
-        for (const proxy of streamProxies) {
-          try {
-            const res = await fetch(proxy);
-            if (res.ok) {
-              const b = await res.blob();
-              if (b.size > 1000) {
-                blob = b;
-                break;
-              }
+
+        // Try direct fetch first
+        try {
+          const directRes = await fetch(fileUrl, { mode: 'cors' });
+          if (directRes.ok) {
+            const b = await directRes.blob();
+            if (b.size > 50000 && !b.type.includes('html')) {
+              blob = b;
             }
-          } catch (e) {
-            continue;
+          }
+        } catch (e) {}
+
+        // Fallback to CORS proxies with MIME validation
+        if (!blob) {
+          const streamProxies = [
+            `https://corsproxy.io/?${encodeURIComponent(fileUrl)}`,
+            `https://api.allorigins.win/raw?url=${encodeURIComponent(fileUrl)}`
+          ];
+
+          for (const proxy of streamProxies) {
+            try {
+              const res = await fetch(proxy);
+              if (res.ok) {
+                const contentType = res.headers.get('content-type') || '';
+                if (contentType.includes('html') || contentType.includes('text')) continue;
+
+                const buffer = await res.arrayBuffer();
+                if (buffer.byteLength > 50000) {
+                  const mime = filename.endsWith('.mp4') ? 'video/mp4' : 'image/jpeg';
+                  blob = new Blob([buffer], { type: mime });
+                  break;
+                }
+              }
+            } catch (e) {
+              continue;
+            }
           }
         }
 
-        if (!blob) {
-          const directRes = await fetch(fileUrl, { mode: 'cors' });
-          blob = await directRes.blob();
+        if (blob) {
+          const blobUrl = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = blobUrl;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+          return;
         }
 
-        const blobUrl = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = blobUrl;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(blobUrl);
+        // Fallback if CORS prevents blob creation: open direct URL in new tab
+        window.open(fileUrl, '_blank');
       } catch (err) {
-        const a = document.createElement('a');
-        a.href = fileUrl;
-        a.download = filename;
-        a.target = '_blank';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        window.open(fileUrl, '_blank');
       }
     }
 
@@ -411,7 +424,6 @@
       el.textContent = message;
     }
 
-    /* Exact matching logic for normal URLs - STRICTLY UNTOUCHED */
     function parseGmapsUrl(str) {
       try {
         const decodedUrl = decodeURIComponent(str);
@@ -425,7 +437,6 @@
       return null;
     }
 
-    /* Enhanced Short Link Resolver - STRICTLY UNTOUCHED */
     async function resolveShortUrl(targetUrl) {
       const endpoints = [
         `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`,
@@ -446,17 +457,14 @@
             text = await res.text();
           }
 
-          // 1. Direct lh3 URL match
           let match = parseGmapsUrl(text);
           if (match) return match;
 
-          // 2. Extract Photo Token Key (AF1Qip...)
           const photoKeyMatch = text.match(/AF1Qip[a-zA-Z0-9_\--]+/);
           if (photoKeyMatch && photoKeyMatch[0]) {
             return `https://lh3.googleusercontent.com/p/${photoKeyMatch[0]}=w2048`;
           }
 
-          // 3. Extract ggpht/googleusercontent asset pattern
           const assetMatch = text.match(/lh3\.googleusercontent\.com\/p\/[a-zA-Z0-9_\--]+/);
           if (assetMatch && assetMatch[0]) {
             return `https://${assetMatch[0]}=w2048`;
@@ -468,9 +476,7 @@
       return null;
     }
 
-    /* ==========================================================================
-       1. GOOGLE MAPS EXTRACTION ENGINE - STRICTLY UNTOUCHED
-       ========================================================================== */
+    /* 1. GOOGLE MAPS */
     async function extractGmapsImage() {
       const inputRaw = document.getElementById('gmaps-url').value.trim();
       const statusId = 'gmaps-status';
@@ -486,10 +492,8 @@
         return;
       }
 
-      // Step 1: Fast path for long URLs - STRICTLY UNTOUCHED
       let highResUrl = parseGmapsUrl(inputRaw);
 
-      // Step 2: Short URL path - Advanced Token & Asset Extraction
       if (!highResUrl) {
         showStatus(statusId, 'info', 'Expanding short link...');
         try {
@@ -505,7 +509,6 @@
         return;
       }
 
-      // Display results
       preview.src = highResUrl;
       link.href = highResUrl;
 
@@ -523,9 +526,7 @@
       };
     }
 
-    /* ==========================================================================
-       2. YOUTUBE EXTRACTION ENGINE - STRICTLY UNTOUCHED
-       ========================================================================== */
+    /* 2. YOUTUBE */
     function extractYouTube() {
       const input = document.getElementById('youtube-url').value.trim();
       const output = document.getElementById('youtube-output');
@@ -571,9 +572,7 @@
       showStatus('youtube-status', 'info', 'YouTube video stream ready.');
     }
 
-    /* ==========================================================================
-       3. TIKTOK EXTRACTION ENGINE - STRICTLY UNTOUCHED
-       ========================================================================== */
+    /* 3. TIKTOK */
     async function extractTikTok() {
       const input = document.getElementById('tiktok-url').value.trim();
       const output = document.getElementById('tiktok-output');
@@ -591,7 +590,7 @@
         const json = await res.json();
 
         if (json && json.code === 0 && json.data) {
-          const directMp4 = json.data.play; // Unwatermarked MP4 video stream
+          const directMp4 = json.data.play;
           preview.innerHTML = `<video controls src="${directMp4}" style="max-height:250px;"></video>`;
           actions.innerHTML = `<button onclick="triggerDirectDownload('${directMp4}', 'tiktok-video.mp4')">⬇️ Download Video (MP4)</button>`;
           output.classList.add('active');
@@ -604,9 +603,7 @@
       }
     }
 
-    /* ==========================================================================
-       4. SNAPCHAT EXTRACTION ENGINE - STRICTLY UNTOUCHED
-       ========================================================================== */
+    /* 4. SNAPCHAT */
     async function extractSnapchat() {
       const input = document.getElementById('snapchat-url').value.trim();
       const output = document.getElementById('snapchat-output');
@@ -648,7 +645,6 @@
 
       let videoUrl = null;
 
-      // 1. Search for raw mediaUrl / overlayMediaUrl in JSON text
       const rawMediaMatch = htmlText.match(/"mediaUrl"\s*:\s*"([^"]+)"/i) ||
                             htmlText.match(/"overlayMediaUrl"\s*:\s*"([^"]+)"/i) ||
                             htmlText.match(/"streamUrl"\s*:\s*"([^"]+)"/i);
@@ -657,7 +653,6 @@
         videoUrl = rawMediaMatch[1];
       }
 
-      // 2. Direct regex search for sc-cdn MP4 URLs
       if (!videoUrl) {
         const cdnMatches = htmlText.match(/https?:\\?\/\\?\/[^"'\s\\]+?\.sc-cdn\.net\\?\/[^"'\s\\]+?\.mp4[^"'\s\\]*/gi);
         if (cdnMatches && cdnMatches.length > 0) {
@@ -665,7 +660,6 @@
         }
       }
 
-      // 3. Fallback to OpenGraph video meta
       if (!videoUrl) {
         const ogMatch = htmlText.match(/<meta\s+property="og:video"\s+content="([^"]+)"/i) ||
                         htmlText.match(/<meta\s+property="og:video:secure_url"\s+content="([^"]+)"/i);
@@ -678,7 +672,6 @@
         return showStatus('snapchat-status', 'error', 'No Snapchat video stream found in page payload.');
       }
 
-      // Clean escape characters (\u0026, \u002F, slashes, &amp;)
       videoUrl = videoUrl
         .replace(/\\u0026/g, '&')
         .replace(/\\u002F/g, '/')
@@ -687,30 +680,7 @@
 
       showStatus('snapchat-status', 'info', 'Loading raw video binary into browser player...');
 
-      let localBlobUrl = null;
-      const streamProxies = [
-        `https://corsproxy.io/?${encodeURIComponent(videoUrl)}`,
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(videoUrl)}`
-      ];
-
-      for (const sProxy of streamProxies) {
-        try {
-          const streamRes = await fetch(sProxy);
-          if (streamRes.ok) {
-            const blob = await streamRes.blob();
-            if (blob.size > 1000) {
-              localBlobUrl = URL.createObjectURL(blob);
-              break;
-            }
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-
-      const activePlayerSrc = localBlobUrl || videoUrl;
-
-      preview.innerHTML = `<video controls autoplay playsinline src="${activePlayerSrc}" style="max-height:250px; width:100%;"></video>`;
+      preview.innerHTML = `<video controls autoplay playsinline src="${videoUrl}" style="max-height:250px; width:100%;"></video>`;
       actions.innerHTML = `
         <button onclick="triggerDirectDownload('${videoUrl}', 'snapchat-video.mp4')">⬇️ Download Video (MP4)</button>
         <a href="${videoUrl}" target="_blank" rel="noopener noreferrer"><button class="btn-secondary">🔗 Direct CDN Link</button></a>
@@ -720,9 +690,7 @@
       showStatus('snapchat-status', 'info', 'Snapchat video stream loaded successfully!');
     }
 
-    /* ==========================================================================
-       5. TWITTER / X EXTRACTION ENGINE (RAW CDN TARGET FIX FOR DOWNLOADS)
-       ========================================================================== */
+    /* 5. TWITTER / X */
     async function extractTwitter() {
       const input = document.getElementById('twitter-url').value.trim();
       const output = document.getElementById('twitter-output');
@@ -754,7 +722,6 @@
           if (!res.ok) continue;
           const data = await res.json();
 
-          // Standard vxTwitter format
           if (data.media_extended && data.media_extended.length > 0) {
             mediaList = data.media_extended.map(m => ({
               type: m.type,
@@ -764,7 +731,6 @@
             break;
           }
 
-          // fxTwitter / fixupx format
           const fxMedia = data.tweet?.media?.all || data.tweet?.media?.videos || data.tweet?.media?.photos;
           if (fxMedia && fxMedia.length > 0) {
             mediaList = fxMedia.map(m => ({
@@ -802,33 +768,7 @@
         } else if (m.type === 'video' || m.type === 'gif') {
           showStatus('twitter-status', 'info', 'Loading Twitter video stream...');
 
-          // Stream through CORS proxy into a local Blob URL for in-page browser player
-          let localBlobUrl = null;
-          const streamProxies = [
-            `https://corsproxy.io/?${encodeURIComponent(m.url)}`,
-            `https://api.allorigins.win/raw?url=${encodeURIComponent(m.url)}`
-          ];
-
-          for (const sProxy of streamProxies) {
-            try {
-              const streamRes = await fetch(sProxy);
-              if (streamRes.ok) {
-                const blob = await streamRes.blob();
-                if (blob.size > 1000) {
-                  localBlobUrl = URL.createObjectURL(blob);
-                  break;
-                }
-              }
-            } catch (e) {
-              continue;
-            }
-          }
-
-          const activeVideoSrc = localBlobUrl || m.url;
-
-          preview.innerHTML += `<video controls autoplay playsinline src="${activeVideoSrc}" style="max-height:250px; width:100%;"></video>`;
-          
-          // CRITICAL FIX: Pass the raw HTTP CDN URL (m.url) to triggerDirectDownload, NOT activeVideoSrc (blob)
+          preview.innerHTML += `<video controls autoplay playsinline src="${m.url}" style="max-height:250px; width:100%;"></video>`;
           actions.innerHTML += `<button onclick="triggerDirectDownload('${m.url}', 'twitter-video.mp4')">⬇️ Download Video (MP4)</button> `;
           actions.innerHTML += `<a href="${m.url}" target="_blank" rel="noopener noreferrer"><button class="btn-secondary">🔗 Direct CDN Link</button></a> `;
         }
@@ -838,9 +778,7 @@
       showStatus('twitter-status', 'info', 'Twitter/X media stream loaded successfully!');
     }
 
-    /* ==========================================================================
-       6. INSTAGRAM EXTRACTION
-       ========================================================================== */
+    /* 6. INSTAGRAM */
     async function extractInstagram() {
       const input = document.getElementById('instagram-url').value.trim();
       const output = document.getElementById('instagram-output');
