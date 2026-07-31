@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Multi-Provider Media Extractor V 1.5</title>
+  <title>Multi-Provider Media Extractor V 1.6</title>
   <style>
     :root {
       --bg-color: #0f172a;
@@ -229,7 +229,7 @@
 
   <div class="main-wrapper">
     <header>
-      <h1 id="app-header-title">Multi-Provider Media Extractor V 1.5</h1>
+      <h1 id="app-header-title">Multi-Provider Media Extractor V 1.6</h1>
       <p>Separate extractors arranged side-by-side for photos and video streams.</p>
     </header>
 
@@ -347,8 +347,8 @@
   </div>
 
   <script>
-    /* Version Tracking - V 1.5 */
-    const APP_VERSION = "V 1.5";
+    /* Version Tracking - V 1.6 */
+    const APP_VERSION = "V 1.6";
     const APP_NAME = "Multi-Provider Media Extractor";
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -387,7 +387,7 @@
       el.textContent = message;
     }
 
-    /* Exact matching logic for normal URLs - UNTOUCHED */
+    /* Exact matching logic for normal URLs - STRICTLY UNTOUCHED */
     function parseGmapsUrl(str) {
       try {
         const decodedUrl = decodeURIComponent(str);
@@ -401,12 +401,12 @@
       return null;
     }
 
-    /* Robust Short Link Expansion Engine V 1.5 */
+    /* Enhanced Short Link Resolver V 1.6 (Supports Photo IDs & Legacy Links) */
     async function resolveShortUrl(targetUrl) {
       const endpoints = [
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`,
+        `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`,
         `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
-        `https://wrapper.api.urlmeta.org/?url=${encodeURIComponent(targetUrl)}`
+        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`
       ];
 
       for (const endpoint of endpoints) {
@@ -414,14 +414,28 @@
           const res = await fetch(endpoint);
           if (!res.ok) continue;
 
-          const text = await res.text();
-          const match = parseGmapsUrl(text);
+          let text = '';
+          if (endpoint.includes('allorigins')) {
+            const data = await res.json();
+            text = (data.contents || '') + ' ' + (data.status?.url || '');
+          } else {
+            text = await res.text();
+          }
+
+          // 1. Direct lh3 URL match
+          let match = parseGmapsUrl(text);
           if (match) return match;
 
-          // Search un-escaped HTML quotes
-          const rawMatch = text.match(/lh3\.googleusercontent\.com\/[^\s"'<>=]+/);
-          if (rawMatch && rawMatch[0]) {
-            return `https://${rawMatch[0]}=w2048`;
+          // 2. Extract Photo Token Key (AF1Qip...)
+          const photoKeyMatch = text.match(/AF1Qip[a-zA-Z0-9_\--]+/);
+          if (photoKeyMatch && photoKeyMatch[0]) {
+            return `https://lh3.googleusercontent.com/p/${photoKeyMatch[0]}=w2048`;
+          }
+
+          // 3. Extract ggpht/googleusercontent asset pattern
+          const assetMatch = text.match(/lh3\.googleusercontent\.com\/p\/[a-zA-Z0-9_\--]+/);
+          if (assetMatch && assetMatch[0]) {
+            return `https://${assetMatch[0]}=w2048`;
           }
         } catch (e) {
           continue;
@@ -431,7 +445,7 @@
     }
 
     /* ==========================================================================
-       1. GOOGLE MAPS EXTRACTION ENGINE V 1.5
+       1. GOOGLE MAPS EXTRACTION ENGINE V 1.6
        ========================================================================== */
     async function extractGmapsImage() {
       const inputRaw = document.getElementById('gmaps-url').value.trim();
@@ -451,7 +465,7 @@
       // Step 1: Fast path for long URLs - STRICTLY UNTOUCHED
       let highResUrl = parseGmapsUrl(inputRaw);
 
-      // Step 2: Short URL path - Resolves maps.app.goo.gl and g.co links
+      // Step 2: Short URL path - Advanced Token & Asset Extraction
       if (!highResUrl) {
         showStatus(statusId, 'info', 'Expanding short link...');
         try {
