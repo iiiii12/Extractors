@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Client-Side Media & Google Maps Image Extractor V 1.0</title>
+  <title>Client-Side Media & Google Maps Image Extractor 2</title>
   <style>
     :root {
       --bg-color: #0f172a;
@@ -74,7 +74,7 @@
       margin-bottom: 1rem;
     }
 
-    input[type="text"], input[type="url"] {
+    input[type="text"] {
       flex: 1;
       background-color: var(--bg-color);
       border: 1px solid var(--border);
@@ -193,31 +193,31 @@
   <div class="container">
     <header>
       <h1>Client-Side Media Extractor</h1>
-      <p>Extract maximum resolution Google Maps photos and parse social media media links directly in browser.</p>
+      <p>Extract maximum resolution Google Maps photos and parse social media links directly in your browser.</p>
     </header>
 
     <!-- GOOGLE MAPS EXTRACTOR -->
     <section class="card">
       <h2>📍 Google Maps High-Res Image Extractor</h2>
       <p class="hint">
-        Accepts direct image links (<code>googleusercontent.com</code>) OR Google Maps share links (<code>maps.app.goo.gl</code> / <code>google.com/maps/...</code>).
+        Paste any Google Maps URL (including place links like <code>google.com/maps/place/...</code> containing embedded media).
       </p>
 
       <div class="input-group">
-        <input type="text" id="gmaps-url" placeholder="Paste Google Maps URL or Image Address..." />
-        <button onclick="extractGmapsImage()">Extract High-Res</button>
+        <input type="text" id="gmaps-url" placeholder="Paste Google Maps URL here..." />
+        <button onclick="extractGmapsImage()">Extract & Prepare Download</button>
       </div>
 
       <div id="gmaps-status" class="status-msg"></div>
 
       <div id="gmaps-output" class="output-area">
         <div class="preview-container">
-          <img id="gmaps-preview" src="" alt="Google Maps Preview" />
+          <img id="gmaps-preview" src="" alt="Google Maps High-Res Preview" />
         </div>
         <div class="action-row">
-          <button id="gmaps-download-btn" onclick="forceDownloadCurrent('gmaps-preview', 'google-maps-highres.jpg')">Download Image</button>
+          <button id="gmaps-download-btn">⬇️ Download Image File</button>
           <a id="gmaps-link" href="#" target="_blank" rel="noopener noreferrer">
-            <button class="btn-secondary">Open Full Source</button>
+            <button class="btn-secondary">Open Direct CDN URL</button>
           </a>
         </div>
       </div>
@@ -245,81 +245,122 @@
   </div>
 
   <script>
-    /* Trigger forced browser file save via blob fetch */
-    async function downloadFileFromUrl(fileUrl, fileName) {
+    /**
+     * Downloads files directly to local storage by fetching raw binary 
+     * blobs and triggering an anchor save element.
+     */
+    async function triggerDirectDownload(fileUrl, filename) {
       try {
-        const response = await fetch(fileUrl);
+        const response = await fetch(fileUrl, { mode: 'cors' });
         const blob = await response.blob();
         const blobUrl = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = blobUrl;
-        a.download = fileName;
+        a.download = filename;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(blobUrl);
       } catch (err) {
-        window.open(fileUrl, '_blank');
+        // Fallback if CORS blocks client-side blob download
+        const a = document.createElement('a');
+        a.href = fileUrl;
+        a.download = filename;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
       }
     }
 
-    function forceDownloadCurrent(imgElementId, defaultName) {
-      const src = document.getElementById(imgElementId).src;
-      if (src) downloadFileFromUrl(src, defaultName);
-    }
-
-    /* GOOGLE MAPS EXTRACTION LOGIC */
-    async function extractGmapsImage() {
-      const input = document.getElementById('gmaps-url').value.trim();
+    /**
+     * GOOGLE MAPS HIGH-RES EXTRACTION LOGIC
+     */
+    function extractGmapsImage() {
+      const inputRaw = document.getElementById('gmaps-url').value.trim();
       const status = document.getElementById('gmaps-status');
       const output = document.getElementById('gmaps-output');
       const preview = document.getElementById('gmaps-preview');
       const link = document.getElementById('gmaps-link');
+      const downloadBtn = document.getElementById('gmaps-download-btn');
 
       status.style.display = 'none';
       output.classList.remove('active');
 
-      if (!input) {
-        showStatus(status, 'error', 'Please enter a URL.');
+      if (!inputRaw) {
+        showStatus(status, 'error', 'Please enter a Google Maps URL.');
         return;
       }
 
-      let targetUrl = input;
-
-      // Extract CDN string embedded inside Google Maps web URLs
-      if (input.includes('google.com/maps') || input.includes('maps.app.goo.gl')) {
-        const cdnMatch = input.match(/(https?:\/\/[^"'\s=]+\.(?:googleusercontent|ggpht)\.com\/[^"'\s=]+)/);
-        if (cdnMatch) {
-          targetUrl = cdnMatch[1];
-        } else {
-          showStatus(status, 'info', 'Parsing page structure... If this is a general map link without an open photo, right-click the photo on Google Maps and choose "Copy Image Address".');
-        }
+      // 1. Fully decode URL parameters (maps links wrap inner CDN URLs inside URL-encoded strings)
+      let decodedInput = inputRaw;
+      try {
+        decodedInput = decodeURIComponent(inputRaw);
+      } catch (e) {
+        decodedInput = inputRaw;
       }
 
-      // Convert size constraints (=w203-h269) to full resolution (=s0)
-      let highResUrl = targetUrl;
-      if (targetUrl.includes('googleusercontent.com') || targetUrl.includes('ggpht.com')) {
-        if (targetUrl.includes('=')) {
-          highResUrl = targetUrl.replace(/=.*$/, '=s0');
-        } else {
-          highResUrl = targetUrl + '=s0';
-        }
+      // 2. Extract Google User Content CDN link pattern using regex
+      const cdnRegex = /(https?:\/\/[^"'\s=!#]+\.(?:googleusercontent|ggpht)\.com\/[^"'\s=!#]+(=[^"'\s!]*)?)/i;
+      const match = decodedInput.match(cdnRegex);
+
+      let targetCdnUrl = null;
+
+      if (match) {
+        targetCdnUrl = match[1];
+      } else if (inputRaw.includes('googleusercontent.com') || inputRaw.includes('ggpht.com')) {
+        targetCdnUrl = inputRaw;
       }
 
+      if (!targetCdnUrl) {
+        showStatus(status, 'error', 'Could not locate an embedded photo CDN link in this URL. Ensure the place link contains an active image photo.');
+        return;
+      }
+
+      // 3. Transform image parameters to request high-resolution output
+      let highResUrl = targetCdnUrl;
+
+      // Handle parameter substitution for Google's photo parameters
+      if (highResUrl.includes('=')) {
+        // Replace dimension parameters (like =w203-h269) with full bounds (=w4080-h4080)
+        highResUrl = highResUrl.replace(/=w\d+-h\d+/, '=w4080-h4080');
+        // Handle standalone bounds
+        if (!highResUrl.includes('w4080')) {
+          highResUrl = highResUrl.replace(/=.*$/, '=w4080-h4080');
+        }
+      } else {
+        highResUrl += '=w4080-h4080';
+      }
+
+      // 4. Update UI and preview elements
       preview.src = highResUrl;
       link.href = highResUrl;
 
+      downloadBtn.onclick = () => {
+        triggerDirectDownload(highResUrl, 'google-maps-photo-highres.jpg');
+      };
+
       preview.onload = () => {
         output.classList.add('active');
-        showStatus(status, 'info', 'High-res image extracted successfully (=s0 applied).');
+        showStatus(status, 'info', 'High-res image extracted successfully! Click "Download Image File" below.');
       };
 
       preview.onerror = () => {
-        showStatus(status, 'error', 'Unable to render image directly. Ensure you copied the direct Image Address from Google Maps.');
+        // Fallback: try max parameter =s0 if w/h modification fails
+        const fallbackUrl = targetCdnUrl.split('=')[0] + '=s0';
+        preview.src = fallbackUrl;
+        link.href = fallbackUrl;
+        downloadBtn.onclick = () => {
+          triggerDirectDownload(fallbackUrl, 'google-maps-photo-highres.jpg');
+        };
+        output.classList.add('active');
+        showStatus(status, 'info', 'High-res image extracted via fallback parameter (=s0).');
       };
     }
 
-    /* SOCIAL MEDIA EXTRACTION LOGIC */
+    /**
+     * SOCIAL MEDIA EXTRACTION LOGIC
+     */
     async function extractSocialMedia() {
       const input = document.getElementById('social-url').value.trim();
       const status = document.getElementById('social-status');
@@ -333,7 +374,7 @@
       actions.innerHTML = '';
 
       if (!input) {
-        showStatus(status, 'error', 'Please enter a valid media link.');
+        showStatus(status, 'error', 'Please enter a valid media URL.');
         return;
       }
 
@@ -347,7 +388,7 @@
 
       const host = parsedUrl.hostname.toLowerCase();
 
-      // 1. YOUTUBE
+      // YOUTUBE
       if (host.includes('youtube.com') || host.includes('youtu.be')) {
         let videoId = host.includes('youtu.be') ? parsedUrl.pathname.slice(1) : parsedUrl.searchParams.get('v');
         if (parsedUrl.pathname.includes('/shorts/')) {
@@ -356,45 +397,43 @@
 
         if (videoId) {
           const maxThumb = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
-          container.innerHTML = `<img id="yt-thumb-img" src="${maxThumb}" alt="YouTube Thumbnail" />`;
+          container.innerHTML = `<img id="yt-thumb-img" src="${maxThumb}" alt="YouTube Cover" />`;
           actions.innerHTML = `
-            <button onclick="downloadFileFromUrl('${maxThumb}', 'youtube-thumbnail.jpg')">Download Max-Res Cover/Thumbnail</button>
+            <button onclick="triggerDirectDownload('${maxThumb}', 'youtube-cover.jpg')">⬇️ Download High-Res Thumbnail</button>
             <a href="https://www.youtube.com/watch?v=${videoId}" target="_blank"><button class="btn-secondary">Open Video</button></a>
           `;
           output.classList.add('active');
-          showStatus(status, 'info', 'YouTube high-res cover extracted. (Direct YouTube video stream downloads are restricted by browser CORS)');
+          showStatus(status, 'info', 'YouTube cover image extracted successfully.');
           return;
         }
       }
 
-      // 2. SNAPCHAT
+      // SNAPCHAT
       if (host.includes('snapchat.com')) {
-        // Snapchat explicitly denies standard iframe rendering (X-Frame-Options: DENY).
-        // Using open oEmbed client-side fetch strategy to extract media preview metadata.
-        showStatus(status, 'info', 'Extracting Snapchat story data...');
+        showStatus(status, 'info', 'Parsing Snapchat media metadata...');
         try {
           const oembedUrl = `https://www.snapchat.com/service/oembed?url=${encodeURIComponent(input)}`;
           const res = await fetch(oembedUrl);
           const data = await res.json();
 
           if (data.thumbnail_url) {
-            container.innerHTML = `<img id="snap-img" src="${data.thumbnail_url}" alt="Snapchat Media" />`;
+            container.innerHTML = `<img id="snap-img" src="${data.thumbnail_url}" alt="Snapchat Preview" />`;
             actions.innerHTML = `
-              <button onclick="downloadFileFromUrl('${data.thumbnail_url}', 'snapchat-media.jpg')">Download Extracted Media</button>
-              <a href="${input}" target="_blank"><button class="btn-secondary">Open on Snapchat</button></a>
+              <button onclick="triggerDirectDownload('${data.thumbnail_url}', 'snapchat-media.jpg')">⬇️ Download Extracted Media</button>
+              <a href="${input}" target="_blank"><button class="btn-secondary">Open Link</button></a>
             `;
           } else {
-            throw new Error('No public thumbnail returned');
+            throw new Error('No media thumbnail found.');
           }
         } catch (e) {
-          container.innerHTML = `<p style="padding:1rem; text-align:center; color: var(--text-muted)">Snapchat blocks direct cross-site embedding via iframe (Refused to connect). Link validated below.</p>`;
-          actions.innerHTML = `<a href="${input}" target="_blank"><button>Open Story on Snapchat</button></a>`;
+          container.innerHTML = `<p style="padding:1rem; text-align:center; color: var(--text-muted)">Snapchat blocks cross-origin iframe embedding. Direct link provided below.</p>`;
+          actions.innerHTML = `<a href="${input}" target="_blank"><button class="btn-secondary">Open Link on Snapchat</button></a>`;
         }
         output.classList.add('active');
         return;
       }
 
-      // 3. INSTAGRAM / TIKTOK / TWITTER (FALLBACK STRATEGY)
+      // INSTAGRAM / TIKTOK / TWITTER
       if (host.includes('instagram.com') || host.includes('tiktok.com') || host.includes('twitter.com') || host.includes('x.com')) {
         let embedPath = '';
         if (host.includes('instagram.com')) {
@@ -410,15 +449,13 @@
 
         if (embedPath) {
           container.innerHTML = `<iframe src="${embedPath}"></iframe>`;
-        } else {
-          container.innerHTML = `<p style="padding:1rem; text-align:center; color: var(--text-muted)">Direct browser media extraction for this link requires server-side authentication bypasses.</p>`;
         }
 
         actions.innerHTML = `
-          <a href="${input}" target="_blank"><button class="btn-secondary">Open Original Link</button></a>
+          <a href="${input}" target="_blank"><button class="btn-secondary">Open Original Post</button></a>
         `;
         output.classList.add('active');
-        showStatus(status, 'info', 'Player loaded. Standard cross-origin security rules prevent direct raw video file downloads without a backend proxy.');
+        showStatus(status, 'info', 'Player rendered. Direct video binary extraction is restricted by cross-origin security rules without a backend proxy.');
         return;
       }
 
