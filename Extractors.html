@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Multi-Provider Media Extractor V 1.9</title>
+  <title>Multi-Provider Media Extractor V 2.0</title>
   <style>
     :root {
       --bg-color: #0f172a;
@@ -229,7 +229,7 @@
 
   <div class="main-wrapper">
     <header>
-      <h1 id="app-header-title">Multi-Provider Media Extractor V 1.9</h1>
+      <h1 id="app-header-title">Multi-Provider Media Extractor V 2.0</h1>
       <p>Separate extractors arranged side-by-side for photos and video streams.</p>
     </header>
 
@@ -275,7 +275,7 @@
         </div>
       </section>
 
-      <!-- 3. TIKTOK (PURE CLIENT-SIDE) -->
+      <!-- 3. TIKTOK (DIRECT API BYPASS - IN-PAGE) -->
       <section class="card">
         <div>
           <h2>🎵 TikTok</h2>
@@ -292,7 +292,7 @@
         </div>
       </section>
 
-      <!-- 4. SNAPCHAT (PURE CLIENT-SIDE) -->
+      <!-- 4. SNAPCHAT -->
       <section class="card">
         <div>
           <h2>👻 Snapchat</h2>
@@ -309,7 +309,7 @@
         </div>
       </section>
 
-      <!-- 5. TWITTER / X (PURE CLIENT-SIDE) -->
+      <!-- 5. TWITTER / X -->
       <section class="card">
         <div>
           <h2>🐦 Twitter / X</h2>
@@ -326,7 +326,7 @@
         </div>
       </section>
 
-      <!-- 6. INSTAGRAM (PURE CLIENT-SIDE) -->
+      <!-- 6. INSTAGRAM -->
       <section class="card">
         <div>
           <h2>📸 Instagram</h2>
@@ -347,8 +347,8 @@
   </div>
 
   <script>
-    /* Version Tracking - V 1.9 */
-    const APP_VERSION = "V 1.9";
+    /* Version Tracking - V 2.0 */
+    const APP_VERSION = "V 2.0";
     const APP_NAME = "Multi-Provider Media Extractor";
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -548,7 +548,7 @@
     }
 
     /* ==========================================================================
-       3. TIKTOK EXTRACTION (PURE IN-PAGE EXTRACTION - NO EXTERNAL BRIDGES)
+       3. TIKTOK EXTRACTION (BYPASSES DIRECT STREAM LOCK VIA CORS API)
        ========================================================================== */
     async function extractTikTok() {
       const input = document.getElementById('tiktok-url').value.trim();
@@ -559,44 +559,29 @@
       output.classList.remove('active');
       if (!input) return showStatus('tiktok-status', 'error', 'Please enter a TikTok URL.');
 
-      showStatus('tiktok-status', 'info', 'Fetching video stream...');
+      showStatus('tiktok-status', 'info', 'Bypassing TikTok restriction and fetching stream...');
 
-      const proxies = [
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(input)}`,
-        `https://corsproxy.io/?${encodeURIComponent(input)}`
-      ];
+      try {
+        const apiUrl = `https://www.tikwm.com/api/?url=${encodeURIComponent(input)}`;
+        const res = await fetch(apiUrl);
+        const json = await res.json();
 
-      let foundUrl = null;
-
-      for (const proxyUrl of proxies) {
-        try {
-          const res = await fetch(proxyUrl);
-          const htmlText = await res.text();
-
-          const mp4Match = htmlText.match(/https?:\/\/[^"'\s]+\.tiktokcdn\.com\/[^"'\s]+\.mp4[^"'\s]*/i) || 
-                           htmlText.match(/\"playAddr\":\"(https?:\\\/\\\/[^"]+)\"/i);
-
-          if (mp4Match) {
-            foundUrl = (mp4Match[1] || mp4Match[0]).replace(/\\/g, '');
-            break;
-          }
-        } catch (e) {
-          continue;
+        if (json && json.code === 0 && json.data) {
+          const directMp4 = json.data.play; // Unwatermarked MP4 video stream
+          preview.innerHTML = `<video controls src="${directMp4}" style="max-height:250px;"></video>`;
+          actions.innerHTML = `<button onclick="triggerDirectDownload('${directMp4}', 'tiktok-video.mp4')">⬇️ Download Video (MP4)</button>`;
+          output.classList.add('active');
+          showStatus('tiktok-status', 'info', 'TikTok video stream ready!');
+        } else {
+          throw new Error(json.msg || 'Invalid response from TikTok provider.');
         }
-      }
-
-      if (foundUrl) {
-        preview.innerHTML = `<video controls src="${foundUrl}" style="max-height:250px;"></video>`;
-        actions.innerHTML = `<button onclick="triggerDirectDownload('${foundUrl}', 'tiktok-video.mp4')">⬇️ Download Video (MP4)</button>`;
-        output.classList.add('active');
-        showStatus('tiktok-status', 'info', 'TikTok video stream ready!');
-      } else {
-        showStatus('tiktok-status', 'error', 'Could not extract raw stream. TikTok security restricted direct fetching on this URL.');
+      } catch (err) {
+        showStatus('tiktok-status', 'error', 'Could not extract video stream: ' + err.message);
       }
     }
 
     /* ==========================================================================
-       4. SNAPCHAT EXTRACTION (PURE IN-PAGE EXTRACTION)
+       4. SNAPCHAT EXTRACTION
        ========================================================================== */
     async function extractSnapchat() {
       const input = document.getElementById('snapchat-url').value.trim();
@@ -633,7 +618,7 @@
     }
 
     /* ==========================================================================
-       5. TWITTER / X EXTRACTION (PURE IN-PAGE EXTRACTION)
+       5. TWITTER / X EXTRACTION
        ========================================================================== */
     async function extractTwitter() {
       const input = document.getElementById('twitter-url').value.trim();
@@ -688,7 +673,7 @@
     }
 
     /* ==========================================================================
-       6. INSTAGRAM EXTRACTION (PURE IN-PAGE EXTRACTION)
+       6. INSTAGRAM EXTRACTION
        ========================================================================== */
     async function extractInstagram() {
       const input = document.getElementById('instagram-url').value.trim();
