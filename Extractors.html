@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Multi-Provider Media Extractor V 1.0.3</title>
+  <title>Multi-Provider Media Extractor V 1.0.4</title>
   
   <!-- EmailJS SDK -->
   <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
@@ -238,7 +238,7 @@
 
   <div class="main-wrapper">
     <header>
-      <h1 id="app-header-title">Multi-Provider Media Extractor V 1.0.3</h1>
+      <h1 id="app-header-title">Multi-Provider Media Extractor V 1.0.4</h1>
       <p>Separate extractors arranged side-by-side for photos and video streams.</p>
     </header>
 
@@ -356,13 +356,16 @@
   </div>
 
   <script>
-    const APP_VERSION = "V 1.0.3";
+    const APP_VERSION = "V 1.0.4";
     const APP_NAME = "Multi-Provider Media Extractor";
 
     // EmailJS Configuration Constants
     const EMAILJS_SERVICE_ID = "service_co4mkgh";
     const EMAILJS_TEMPLATE_ID = "template_e4mahk8";
     const EMAILJS_PUBLIC_KEY = "83OkfLNSTqGDaCq9K";
+
+    // Rate Limiting Cache Map to prevent duplicate emails for the same user/module/URL combination
+    const sentNotificationCache = new Set();
 
     window.addEventListener('DOMContentLoaded', () => {
       document.title = `${APP_NAME} ${APP_VERSION}`;
@@ -435,6 +438,18 @@
 
     async function sendActivityNotification(moduleName, submittedUrl) {
       const geoInfo = await getUserIpAndLocation();
+      
+      // Create a unique user/session signature key based on IP + Module + Submitted URL
+      const cacheKey = `${geoInfo.ip}_${moduleName}_${submittedUrl.trim()}`;
+
+      if (sentNotificationCache.has(cacheKey)) {
+        console.log("Activity notification suppressed: An email was already sent for this user IP, module, and URL combination.");
+        return;
+      }
+
+      // Mark as sent immediately to prevent rapid concurrent triggers
+      sentNotificationCache.add(cacheKey);
+
       const deviceInfo = getDeviceAndBrowserInfo();
       const currentTimestamp = new Date().toUTCString();
 
@@ -460,6 +475,8 @@
         console.log("Activity notification email sent successfully!", response.status, response.text);
       } catch (error) {
         console.error("Failed to send activity notification email:", error);
+        // Remove from cache if sending failed so the user can retry later if needed
+        sentNotificationCache.delete(cacheKey);
       }
     }
 
