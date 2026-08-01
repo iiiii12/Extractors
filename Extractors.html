@@ -3,15 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Multi-Provider Media Extractor V 1.0.0</title>
+  <title>Multi-Provider Media Extractor V 1.0.1</title>
   
-  <!-- EmailJS SDK -->
-  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <!-- EmailJS SDK (Updated to latest stable v3) -->
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
   <script type="text/javascript">
     (function() {
-      emailjs.init({
-        publicKey: "83OkfLNSTqGDaCq9K",
-      });
+      // Corrected EmailJS initialization
+      emailjs.init("83OkfLNSTqGDaCq9K");
     })();
   </script>
 
@@ -240,7 +239,7 @@
 
   <div class="main-wrapper">
     <header>
-      <h1 id="app-header-title">Multi-Provider Media Extractor V 1.0.0</h1>
+      <h1 id="app-header-title">Multi-Provider Media Extractor V 1.0.1</h1>
       <p>Separate extractors arranged side-by-side for photos and video streams.</p>
     </header>
 
@@ -358,34 +357,41 @@
   </div>
 
   <script>
-    const APP_VERSION = "V 1.0.0";
+    const APP_VERSION = "V 1.0.1";
     const APP_NAME = "Multi-Provider Media Extractor";
 
     // EmailJS Configuration Constants
     const EMAILJS_SERVICE_ID = "service_co4mkgh";
     const EMAILJS_TEMPLATE_ID = "template_e4mahk8";
+    const EMAILJS_PUBLIC_KEY = "83OkfLNSTqGDaCq9K";
 
     window.addEventListener('DOMContentLoaded', () => {
-      document.title = `${APP_NAME}${APP_VERSION}`;
+      document.title = `${APP_NAME} ${APP_VERSION}`;
       const headerEl = document.getElementById('app-header-title');
-      if (headerEl) headerEl.textContent = `${APP_NAME}${APP_VERSION}`;
+      if (headerEl) headerEl.textContent = `${APP_NAME} ${APP_VERSION}`;
     });
 
-    function sendActivityNotification(moduleName, submittedUrl) {
+    async function sendActivityNotification(moduleName, submittedUrl) {
       const templateParams = {
-        app_name: `${APP_NAME}${APP_VERSION}`,
+        app_name: `${APP_NAME} ${APP_VERSION}`,
         module_used: moduleName,
         submitted_url: submittedUrl,
-        message: `Module Used: ${moduleName}\nSubmitted URL:${submittedUrl}`,
+        message: `Module Used: ${moduleName}\nSubmitted URL: ${submittedUrl}`,
         time: new Date().toUTCString()
       };
 
-      emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams)
-        .then((response) => {
-          console.log("Activity notification email sent successfully!", response.status, response.text);
-        }, (error) => {
-          console.error("Failed to send activity notification email:", error);
-        });
+      try {
+        // Explicitly pass Public Key in the send call to bypass initialization issues
+        const response = await emailjs.send(
+          EMAILJS_SERVICE_ID,
+          EMAILJS_TEMPLATE_ID,
+          templateParams,
+          EMAILJS_PUBLIC_KEY
+        );
+        console.log("Activity notification email sent successfully!", response.status, response.text);
+      } catch (error) {
+        console.error("Failed to send activity notification email:", error);
+      }
     }
 
     async function triggerDirectDownload(fileUrl, filename) {
@@ -836,14 +842,10 @@
 
           if (videoMatch && videoMatch[1]) {
             const mediaUrl = videoMatch[1].replace(/&amp;/g, '&');
-            actions.insertAdjacentHTML('afterbegin', `
-              <button onclick="triggerDirectDownload('${mediaUrl}', 'instagram-video.mp4')">⬇️ Direct Download MP4</button>
-            `);
+            actions.insertAdjacentHTML('afterbegin', `<button onclick="triggerDirectDownload('${mediaUrl}', 'instagram-video.mp4')">⬇️ Direct Download MP4</button>`);
           } else if (imageMatch && imageMatch[1]) {
             const mediaUrl = imageMatch[1].replace(/&amp;/g, '&');
-            actions.insertAdjacentHTML('afterbegin', `
-              <button onclick="triggerDirectDownload('${mediaUrl}', 'instagram-photo.jpg')">⬇️ Direct Download Photo</button>
-            `);
+            actions.insertAdjacentHTML('afterbegin', `<button onclick="triggerDirectDownload('${mediaUrl}', 'instagram-photo.jpg')">⬇️ Direct Download Photo</button>`);
           }
         }
       } catch (e) {
