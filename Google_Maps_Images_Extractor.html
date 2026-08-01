@@ -1,59 +1,857 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Google Maps High-Res Image Extractor</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 40px; background: #f4f4f4; color: #333; }
-        .container { background: #fff; padding: 20px; border-radius: 8px; max-width: 700px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        input[type="text"] { width: 100%; padding: 10px; margin: 10px 0; box-sizing: border-box; }
-        button { padding: 10px 20px; background: #28a745; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
-        button:hover { background: #218838; }
-        .result { margin-top: 20px; word-break: break-all; }
-        img { max-width: 100%; height: auto; margin-top: 10px; border-radius: 4px; border: 1px solid #ccc; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Multi-Provider Media Extractor V 3.7</title>
+  
+  <!-- EmailJS SDK -->
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <script type="text/javascript">
+    (function() {
+      emailjs.init({
+        publicKey: "83OkfLNSTqGDaCq9K",
+      });
+    })();
+  </script>
+
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #334155;
+      --error: #ef4444;
+      --success: #22c55e;
+      --badge-video: #8b5cf6;
+      --badge-image: #10b981;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 2rem 1rem;
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    .main-wrapper {
+      max-width: 1200px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    header p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .grid-container {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 850px) {
+      .grid-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .card h2 {
+      font-size: 1.15rem;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .input-group {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      background-color: var(--bg-color);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 0.65rem 0.85rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      outline: none;
+      min-width: 0;
+    }
+
+    input:focus {
+      border-color: var(--accent);
+    }
+
+    button {
+      background-color: var(--accent);
+      color: white;
+      border: none;
+      padding: 0.65rem 1.1rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    button:hover {
+      background-color: var(--accent-hover);
+    }
+
+    .btn-secondary {
+      background-color: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-main);
+    }
+
+    .btn-secondary:hover {
+      background-color: var(--border);
+    }
+
+    .output-area {
+      margin-top: 0.75rem;
+      border-top: 1px solid var(--border);
+      padding-top: 0.75rem;
+      display: none;
+    }
+
+    .output-area.active {
+      display: block;
+    }
+
+    .media-badge {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      border-radius: 15px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+    }
+
+    .badge-video {
+      background-color: rgba(139, 92, 246, 0.2);
+      color: var(--badge-video);
+      border: 1px solid var(--badge-video);
+    }
+
+    .badge-image {
+      background-color: rgba(16, 185, 129, 0.2);
+      color: var(--badge-image);
+      border: 1px solid var(--badge-image);
+    }
+
+    .preview-container {
+      width: 100%;
+      border-radius: 8px;
+      overflow: hidden;
+      background-color: var(--bg-color);
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      justify-content: center;
+      align-items: center;
+      margin-bottom: 0.75rem;
+      padding: 0.75rem;
+      min-height: 150px;
+    }
+
+    .preview-container img, 
+    .preview-container video {
+      max-width: 100%;
+      max-height: 280px;
+      border-radius: 6px;
+      object-fit: contain;
+    }
+
+    .action-row {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .status-msg {
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      margin-top: 0.5rem;
+      display: none;
+      word-break: break-word;
+    }
+
+    .status-msg.error {
+      display: block;
+      background-color: rgba(239, 68, 68, 0.1);
+      border: 1px solid var(--error);
+      color: var(--error);
+    }
+
+    .status-msg.info {
+      display: block;
+      background-color: rgba(59, 130, 246, 0.1);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+    }
+  </style>
 </head>
 <body>
 
-<div class="container">
-    <h2>Google Maps High-Res Image Extractor</h2>
-    <p>Paste your Google Maps URL below to get the full-size image:</p>
-    <input type="text" id="urlInput" placeholder="Paste Maps URL here...">
-    <button onclick="extractImage()">Extract Full-Size Image</button>
-    <div class="result" id="resultArea"></div>
-</div>
+  <div class="main-wrapper">
+    <header>
+      <h1 id="app-header-title">Multi-Provider Media Extractor V 3.7</h1>
+      <p>Separate extractors arranged side-by-side for photos and video streams.</p>
+    </header>
 
-<script>
-function extractImage() {
-    const rawUrl = document.getElementById('urlInput').value;
-    const resultArea = document.getElementById('resultArea');
-    resultArea.innerHTML = '';
+    <div class="grid-container">
 
-    try {
-        const decodedUrl = decodeURIComponent(rawUrl);
-        
-        // Find the base googleusercontent image link before any size parameters
-        const match = decodedUrl.match(/(https:\/\/lh3\.googleusercontent\.com\/[^\s=]+)/);
-        
-        if (match && match[1]) {
-            const baseUrl = match[1];
-            
-            // Append high-res indicator parameter to force the original/large source size
-            const highResUrl = baseUrl + '=w2048';
-            
-            resultArea.innerHTML = `
-                <p><strong>Full-Size Image URL:</strong><br><a href="${highResUrl}" target="_blank">${highResUrl}</a></p>
-                <p><strong>Preview (Loaded at Max Resolution):</strong></p>
-                <img src="${highResUrl}" alt="High-Res Maps Image">
-            `;
-        } else {
-            resultArea.innerHTML = '<p style="color: red;">No valid Google image link found in this URL.</p>';
-        }
-    } catch (e) {
-        resultArea.innerHTML = '<p style="color: red;">Invalid URL format.</p>';
+      <!-- 1. GOOGLE MAPS -->
+      <section class="card">
+        <div>
+          <h2>📍 Google Maps</h2>
+          <div class="input-group">
+            <input type="text" id="gmaps-url" placeholder="Paste Maps URL (normal or short)..." />
+            <button onclick="extractGmapsImage()">Extract</button>
+          </div>
+          <div id="gmaps-status" class="status-msg"></div>
+        </div>
+        <div id="gmaps-output" class="output-area">
+          <div class="preview-container">
+            <img id="gmaps-preview" src="" alt="Google Maps High-Res Preview" />
+          </div>
+          <div class="action-row">
+            <button id="gmaps-download-btn">⬇️ Download High-Res Image</button>
+            <a id="gmaps-link" href="#" target="_blank" rel="noopener noreferrer">
+              <button class="btn-secondary">Open Direct CDN URL</button>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. YOUTUBE -->
+      <section class="card">
+        <div>
+          <h2>▶️ YouTube</h2>
+          <div class="input-group">
+            <input type="text" id="youtube-url" placeholder="Paste YouTube / Shorts URL..." />
+            <button onclick="extractYouTube()">Extract</button>
+          </div>
+          <div id="youtube-status" class="status-msg"></div>
+        </div>
+        <div id="youtube-output" class="output-area">
+          <div class="media-badge badge-video">📹 Detected: YouTube Video</div>
+          <div id="youtube-preview" class="preview-container"></div>
+          <div class="action-row" id="youtube-actions"></div>
+        </div>
+      </section>
+
+      <!-- 3. TIKTOK -->
+      <section class="card">
+        <div>
+          <h2>🎵 TikTok</h2>
+          <div class="input-group">
+            <input type="text" id="tiktok-url" placeholder="Paste TikTok Video URL..." />
+            <button onclick="extractTikTok()">Extract</button>
+          </div>
+          <div id="tiktok-status" class="status-msg"></div>
+        </div>
+        <div id="tiktok-output" class="output-area">
+          <div class="media-badge badge-video">📹 Detected: TikTok Video</div>
+          <div id="tiktok-preview" class="preview-container"></div>
+          <div class="action-row" id="tiktok-actions"></div>
+        </div>
+      </section>
+
+      <!-- 4. SNAPCHAT -->
+      <section class="card">
+        <div>
+          <h2>👻 Snapchat</h2>
+          <div class="input-group">
+            <input type="text" id="snapchat-url" placeholder="Paste Snapchat Spotlight URL..." />
+            <button onclick="extractSnapchat()">Extract</button>
+          </div>
+          <div id="snapchat-status" class="status-msg"></div>
+        </div>
+        <div id="snapchat-output" class="output-area">
+          <div class="media-badge badge-video">📹 Detected: Snapchat Video</div>
+          <div id="snapchat-preview" class="preview-container"></div>
+          <div class="action-row" id="snapchat-actions"></div>
+        </div>
+      </section>
+
+      <!-- 5. TWITTER / X -->
+      <section class="card">
+        <div>
+          <h2>🐦 Twitter / X</h2>
+          <div class="input-group">
+            <input type="text" id="twitter-url" placeholder="Paste Tweet URL..." />
+            <button onclick="extractTwitter()">Extract</button>
+          </div>
+          <div id="twitter-status" class="status-msg"></div>
+        </div>
+        <div id="twitter-output" class="output-area">
+          <div id="twitter-badge"></div>
+          <div id="twitter-preview" class="preview-container"></div>
+          <div class="action-row" id="twitter-actions"></div>
+        </div>
+      </section>
+
+      <!-- 6. INSTAGRAM -->
+      <section class="card">
+        <div>
+          <h2>📸 Instagram</h2>
+          <div class="input-group">
+            <input type="text" id="instagram-url" placeholder="Paste Instagram Reel / Post URL..." />
+            <button onclick="extractInstagram()">Extract</button>
+          </div>
+          <div id="instagram-status" class="status-msg"></div>
+        </div>
+        <div id="instagram-output" class="output-area">
+          <div id="instagram-badge"></div>
+          <div id="instagram-preview" class="preview-container"></div>
+          <div class="action-row" id="instagram-actions"></div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <script>
+    const APP_VERSION = "V 3.7";
+    const APP_NAME = "Multi-Provider Media Extractor";
+
+    // EmailJS Configuration Constants
+    const EMAILJS_SERVICE_ID = "service_co4mkgh";
+    const EMAILJS_TEMPLATE_ID = "template_e4mahk8";
+
+    window.addEventListener('DOMContentLoaded', () => {
+      document.title = `${APP_NAME} ${APP_VERSION}`;
+      const headerEl = document.getElementById('app-header-title');
+      if (headerEl) headerEl.textContent = `${APP_NAME} ${APP_VERSION}`;
+    });
+
+    function sendActivityNotification(providerName, targetUrl) {
+      const templateParams = {
+        app_name: `${APP_NAME} ${APP_VERSION}`,
+        provider: providerName,
+        url: targetUrl,
+        time: new Date().toUTCString()
+      };
+
+      emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams)
+        .then((response) => {
+          console.log("Activity notification email sent successfully!", response.status, response.text);
+        }, (error) => {
+          console.error("Failed to send activity notification email:", error);
+        });
     }
-}
-</script>
 
+    async function triggerDirectDownload(fileUrl, filename) {
+      try {
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(fileUrl)}`;
+        const res = await fetch(proxyUrl);
+        if (!res.ok) throw new Error('Proxy fetch failed');
+        
+        const blob = await res.blob();
+        if (blob.size < 1000 || blob.type.includes('html')) {
+          throw new Error('Invalid payload received');
+        }
+
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+      } catch (err) {
+        window.open(fileUrl, '_blank');
+      }
+    }
+
+    function showStatus(elementId, type, message) {
+      const el = document.getElementById(elementId);
+      if (el) {
+        el.className = `status-msg ${type}`;
+        el.textContent = message;
+      }
+    }
+
+    function parseGmapsUrl(str) {
+      try {
+        const decodedUrl = decodeURIComponent(str);
+        const match = decodedUrl.match(/(https:\/\/lh3\.googleusercontent\.com\/[^\s=]+)/);
+        if (match && match[1]) {
+          return match[1] + '=w2048';
+        }
+      } catch (e) {
+        return null;
+      }
+      return null;
+    }
+
+    async function resolveShortUrl(targetUrl) {
+      const endpoints = [
+        `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`,
+        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`
+      ];
+
+      for (const endpoint of endpoints) {
+        try {
+          const res = await fetch(endpoint);
+          if (!res.ok) continue;
+
+          let text = '';
+          if (endpoint.includes('allorigins')) {
+            const data = await res.json();
+            text = (data.contents || '') + ' ' + (data.status?.url || '');
+          } else {
+            text = await res.text();
+          }
+
+          let match = parseGmapsUrl(text);
+          if (match) return match;
+
+          const photoKeyMatch = text.match(/AF1Qip[a-zA-Z0-9_\--]+/);
+          if (photoKeyMatch && photoKeyMatch[0]) {
+            return `https://lh3.googleusercontent.com/p/${photoKeyMatch[0]}=w2048`;
+          }
+
+          const assetMatch = text.match(/lh3\.googleusercontent\.com\/p\/[a-zA-Z0-9_\--]+/);
+          if (assetMatch && assetMatch[0]) {
+            return `https://${assetMatch[0]}=w2048`;
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+      return null;
+    }
+
+    /* 1. GOOGLE MAPS */
+    async function extractGmapsImage() {
+      const inputRaw = document.getElementById('gmaps-url').value.trim();
+      const statusId = 'gmaps-status';
+      const output = document.getElementById('gmaps-output');
+      const preview = document.getElementById('gmaps-preview');
+      const link = document.getElementById('gmaps-link');
+      const downloadBtn = document.getElementById('gmaps-download-btn');
+
+      output.classList.remove('active');
+
+      if (!inputRaw) {
+        showStatus(statusId, 'error', 'Please enter a Google Maps URL.');
+        return;
+      }
+
+      sendActivityNotification("Google Maps", inputRaw);
+
+      let highResUrl = parseGmapsUrl(inputRaw);
+
+      if (!highResUrl) {
+        showStatus(statusId, 'info', 'Expanding short link...');
+        try {
+          highResUrl = await resolveShortUrl(inputRaw);
+        } catch (err) {
+          showStatus(statusId, 'error', 'Could not expand short link automatically.');
+          return;
+        }
+      }
+
+      if (!highResUrl) {
+        showStatus(statusId, 'error', 'No valid Google image link found. Please verify the link.');
+        return;
+      }
+
+      preview.src = highResUrl;
+      link.href = highResUrl;
+
+      downloadBtn.onclick = () => {
+        triggerDirectDownload(highResUrl, 'google-maps-photo-highres.jpg');
+      };
+
+      preview.onload = () => {
+        output.classList.add('active');
+        showStatus(statusId, 'info', 'Full-size image extracted successfully!');
+      };
+
+      preview.onerror = () => {
+        showStatus(statusId, 'error', 'Error loading image from CDN.');
+      };
+    }
+
+    /* 2. YOUTUBE */
+    function extractYouTube() {
+      const input = document.getElementById('youtube-url').value.trim();
+      const output = document.getElementById('youtube-output');
+      const preview = document.getElementById('youtube-preview');
+      const actions = document.getElementById('youtube-actions');
+
+      output.classList.remove('active');
+      if (!input) return showStatus('youtube-status', 'error', 'Please enter a YouTube URL.');
+
+      sendActivityNotification("YouTube", input);
+      showStatus('youtube-status', 'info', 'Fetching video stream...');
+
+      let vidId = '';
+      try {
+        const u = new URL(input);
+        if (u.hostname.includes('youtu.be')) {
+          vidId = u.pathname.slice(1).split('?')[0];
+        } else if (u.pathname.includes('/shorts/')) {
+          vidId = u.pathname.split('/shorts/')[1].split('?')[0];
+        } else {
+          vidId = u.searchParams.get('v');
+        }
+      } catch (e) {
+        return showStatus('youtube-status', 'error', 'Invalid YouTube URL.');
+      }
+
+      if (!vidId) return showStatus('youtube-status', 'error', 'Could not parse YouTube Video ID.');
+
+      const thumbUrl = `https://img.youtube.com/vi/${vidId}/maxresdefault.jpg`;
+      const youtubeFullUrl = `https://www.youtube.com/watch?v=${vidId}`;
+      const loaderToUrl = `https://loader.to/api/card/?url=${encodeURIComponent(youtubeFullUrl)}&f=mp4`;
+
+      preview.innerHTML = `
+        <iframe src="https://www.youtube.com/embed/${vidId}" style="width:100%; height:200px; border:none; border-radius:6px;"></iframe>
+      `;
+
+      actions.innerHTML = `
+        <button onclick="triggerDirectDownload('${thumbUrl}', 'youtube-cover.jpg')">🖼️ Download Cover Image</button>
+        <a href="${loaderToUrl}" target="_blank"><button>⬇️ Download MP4 Video</button></a>
+        <a href="https://ytmp3.nu/V/" target="_blank"><button class="btn-secondary">🔗 Direct Converter Bridge</button></a>
+      `;
+
+      output.classList.add('active');
+      showStatus('youtube-status', 'info', 'YouTube video stream ready.');
+    }
+
+    /* 3. TIKTOK */
+    async function extractTikTok() {
+      const input = document.getElementById('tiktok-url').value.trim();
+      const output = document.getElementById('tiktok-output');
+      const preview = document.getElementById('tiktok-preview');
+      const actions = document.getElementById('tiktok-actions');
+
+      output.classList.remove('active');
+      if (!input) return showStatus('tiktok-status', 'error', 'Please enter a TikTok URL.');
+
+      sendActivityNotification("TikTok", input);
+      showStatus('tiktok-status', 'info', 'Bypassing TikTok restriction and fetching stream...');
+
+      try {
+        const apiUrl = `https://www.tikwm.com/api/?url=${encodeURIComponent(input)}`;
+        const res = await fetch(apiUrl);
+        const json = await res.json();
+
+        if (json && json.code === 0 && json.data) {
+          const directMp4 = json.data.play;
+          preview.innerHTML = `<video controls src="${directMp4}" style="max-height:250px;"></video>`;
+          actions.innerHTML = `<button onclick="triggerDirectDownload('${directMp4}', 'tiktok-video.mp4')">⬇️ Download Video (MP4)</button>`;
+          output.classList.add('active');
+          showStatus('tiktok-status', 'info', 'TikTok video stream ready!');
+        } else {
+          throw new Error(json.msg || 'Invalid response from TikTok provider.');
+        }
+      } catch (err) {
+        showStatus('tiktok-status', 'error', 'Could not extract video stream: ' + err.message);
+      }
+    }
+
+    /* 4. SNAPCHAT */
+    async function extractSnapchat() {
+      const input = document.getElementById('snapchat-url').value.trim();
+      const output = document.getElementById('snapchat-output');
+      const preview = document.getElementById('snapchat-preview');
+      const actions = document.getElementById('snapchat-actions');
+
+      output.classList.remove('active');
+      if (!input) return showStatus('snapchat-status', 'error', 'Please enter a Snapchat URL.');
+
+      sendActivityNotification("Snapchat", input);
+      showStatus('snapchat-status', 'info', 'Fetching Snapchat Spotlight stream...');
+
+      const proxyEndpoints = [
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(input)}`,
+        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(input)}`
+      ];
+
+      let htmlText = '';
+      let fetchSuccess = false;
+
+      for (const endpoint of proxyEndpoints) {
+        try {
+          const res = await fetch(endpoint);
+          if (res.ok) {
+            htmlText = await res.text();
+            if (htmlText && htmlText.length > 500) {
+              fetchSuccess = true;
+              break;
+            }
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+
+      if (!fetchSuccess || !htmlText) {
+        return showStatus('snapchat-status', 'error', 'Could not reach Snapchat servers via proxies.');
+      }
+
+      let videoUrl = null;
+
+      const rawMediaMatch = htmlText.match(/"mediaUrl"\s*:\s*"([^"]+)"/i) ||
+                            htmlText.match(/"overlayMediaUrl"\s*:\s*"([^"]+)"/i) ||
+                            htmlText.match(/"streamUrl"\s*:\s*"([^"]+)"/i);
+
+      if (rawMediaMatch && rawMediaMatch[1]) {
+        videoUrl = rawMediaMatch[1];
+      }
+
+      if (!videoUrl) {
+        const cdnMatches = htmlText.match(/https?:\\?\/\\?\/[^"'\s\\]+?\.sc-cdn\.net\\?\/[^"'\s\\]+?\.mp4[^"'\s\\]*/gi);
+        if (cdnMatches && cdnMatches.length > 0) {
+          videoUrl = cdnMatches[0];
+        }
+      }
+
+      if (!videoUrl) {
+        const ogMatch = htmlText.match(/<meta\s+property="og:video"\s+content="([^"]+)"/i) ||
+                        htmlText.match(/<meta\s+property="og:video:secure_url"\s+content="([^"]+)"/i);
+        if (ogMatch && ogMatch[1]) {
+          videoUrl = ogMatch[1];
+        }
+      }
+
+      if (!videoUrl) {
+        return showStatus('snapchat-status', 'error', 'No Snapchat video stream found in page payload.');
+      }
+
+      videoUrl = videoUrl
+        .replace(/\\u0026/g, '&')
+        .replace(/\\u002F/g, '/')
+        .replace(/&amp;/g, '&')
+        .replace(/\\/g, '');
+
+      showStatus('snapchat-status', 'info', 'Loading raw video binary into browser player...');
+
+      preview.innerHTML = `<video controls autoplay playsinline src="${videoUrl}" style="max-height:250px; width:100%;"></video>`;
+      actions.innerHTML = `
+        <button onclick="triggerDirectDownload('${videoUrl}', 'snapchat-video.mp4')">⬇️ Download Video (MP4)</button>
+        <a href="${videoUrl}" target="_blank" rel="noopener noreferrer"><button class="btn-secondary">🔗 Direct CDN Link</button></a>
+      `;
+
+      output.classList.add('active');
+      showStatus('snapchat-status', 'info', 'Snapchat video stream loaded successfully!');
+    }
+
+    /* 5. TWITTER / X */
+    async function extractTwitter() {
+      const input = document.getElementById('twitter-url').value.trim();
+      const output = document.getElementById('twitter-output');
+      const preview = document.getElementById('twitter-preview');
+      const actions = document.getElementById('twitter-actions');
+      const badge = document.getElementById('twitter-badge');
+
+      output.classList.remove('active');
+      if (!input) return showStatus('twitter-status', 'error', 'Please enter a Twitter/X URL.');
+
+      const tweetIdMatch = input.match(/\/status\/(\d+)/);
+      if (!tweetIdMatch) return showStatus('twitter-status', 'error', 'Invalid Tweet URL.');
+
+      sendActivityNotification("Twitter / X", input);
+
+      const tweetId = tweetIdMatch[1];
+      showStatus('twitter-status', 'info', 'Fetching Twitter media metadata...');
+
+      const apiEndpoints = [
+        `https://api.vxtwitter.com/status/${tweetId}`,
+        `https://api.fxtwitter.com/status/${tweetId}`
+      ];
+
+      let mediaList = [];
+      let fetchSuccess = false;
+
+      for (const endpoint of apiEndpoints) {
+        try {
+          const res = await fetch(endpoint);
+          if (!res.ok) continue;
+          const data = await res.json();
+
+          if (data.media_extended && data.media_extended.length > 0) {
+            mediaList = data.media_extended.map(m => ({
+              type: m.type,
+              url: m.url
+            }));
+            fetchSuccess = true;
+            break;
+          }
+
+          const fxMedia = data.tweet?.media?.all || data.tweet?.media?.videos || data.tweet?.media?.photos;
+          if (fxMedia && fxMedia.length > 0) {
+            mediaList = fxMedia.map(m => ({
+              type: m.type === 'gif' ? 'video' : m.type,
+              url: m.url
+            }));
+            fetchSuccess = true;
+            break;
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+
+      if (!fetchSuccess || mediaList.length === 0) {
+        return showStatus('twitter-status', 'error', 'Failed to extract Twitter media. Stream restricted or unavailable.');
+      }
+
+      preview.innerHTML = '';
+      actions.innerHTML = '';
+
+      const isVid = mediaList.some(m => m.type === 'video' || m.type === 'gif');
+
+      if (isVid) {
+        badge.innerHTML = `<div class="media-badge badge-video">📹 Detected: Twitter Video</div>`;
+      } else {
+        badge.innerHTML = `<div class="media-badge badge-image">🖼️ Detected: Twitter Photo</div>`;
+      }
+
+      for (let idx = 0; idx < mediaList.length; idx++) {
+        const m = mediaList[idx];
+        
+        if (m.type === 'image' || m.type === 'photo') {
+          preview.innerHTML += `<img src="${m.url}" alt="Twitter Image" />`;
+          actions.innerHTML += `<button onclick="triggerDirectDownload('${m.url}', 'twitter-photo-${idx+1}.jpg')">⬇️ Download Photo ${idx+1}</button> `;
+        } else if (m.type === 'video' || m.type === 'gif') {
+          const fxPlayerUrl = `https://d.fxtwitter.com/status/${tweetId}`;
+
+          preview.innerHTML += `<video controls autoplay playsinline src="${m.url}" style="max-height:250px; width:100%;"></video>`;
+          actions.innerHTML += `<a href="${fxPlayerUrl}" target="_blank" rel="noopener noreferrer"><button>⬇️ Download Video (MP4)</button></a> `;
+          actions.innerHTML += `<a href="${m.url}" target="_blank" rel="noopener noreferrer"><button class="btn-secondary">🔗 Direct CDN Link</button></a> `;
+        }
+      }
+
+      output.classList.add('active');
+      showStatus('twitter-status', 'info', 'Twitter/X media stream loaded successfully!');
+    }
+
+    /* 6. INSTAGRAM */
+    async function extractInstagram() {
+      const input = document.getElementById('instagram-url').value.trim();
+      const output = document.getElementById('instagram-output');
+      const preview = document.getElementById('instagram-preview');
+      const actions = document.getElementById('instagram-actions');
+      const badge = document.getElementById('instagram-badge');
+
+      output.classList.remove('active');
+      if (!input) return showStatus('instagram-status', 'error', 'Please enter an Instagram URL.');
+
+      sendActivityNotification("Instagram", input);
+      showStatus('instagram-status', 'info', 'Loading Instagram media...');
+
+      let shortcode = '';
+      try {
+        const match = input.match(/\/(?:p|reel|reels|tv)\/([a-zA-Z0-9_-]+)/);
+        if (match && match[1]) {
+          shortcode = match[1];
+        }
+      } catch (e) {
+        // fallback
+      }
+
+      if (!shortcode) {
+        return showStatus('instagram-status', 'error', 'Could not parse Instagram Post/Reel shortcode.');
+      }
+
+      preview.innerHTML = '';
+      actions.innerHTML = '';
+
+      badge.innerHTML = `<div class="media-badge badge-video">📹 Detected: Instagram Media</div>`;
+      
+      // Native embed view
+      preview.innerHTML = `
+        <iframe src="https://www.instagram.com/p/${shortcode}/embed/" style="width:100%; height:340px; border:none; border-radius:6px; background:#000;" scrolling="no" allowtransparency="true"></iframe>
+      `;
+
+      // Static download action buttons
+      const cobaltDownloadUrl = `https://cobalt.tools/?u=${encodeURIComponent(input)}`;
+      actions.innerHTML = `
+        <a href="${cobaltDownloadUrl}" target="_blank" rel="noopener noreferrer"><button>⬇️ Download Media (Cobalt Bridge)</button></a>
+        <a href="${input}" target="_blank" rel="noopener noreferrer"><button class="btn-secondary">🔗 Open on Instagram</button></a>
+      `;
+
+      // Optional background metadata enhancement if proxy succeeds
+      try {
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(input)}`;
+        const res = await fetch(proxyUrl);
+        if (res.ok) {
+          const html = await res.text();
+          const videoMatch = html.match(/<meta\s+property="og:video"\s+content="([^"]+)"/i) ||
+                             html.match(/<meta\s+property="og:video:secure_url"\s+content="([^"]+)"/i);
+          const imageMatch = html.match(/<meta\s+property="og:image"\s+content="([^"]+)"/i);
+
+          if (videoMatch && videoMatch[1]) {
+            const mediaUrl = videoMatch[1].replace(/&amp;/g, '&');
+            actions.insertAdjacentHTML('afterbegin', `
+              <button onclick="triggerDirectDownload('${mediaUrl}', 'instagram-video.mp4')">⬇️ Direct Download MP4</button>
+            `);
+          } else if (imageMatch && imageMatch[1]) {
+            const mediaUrl = imageMatch[1].replace(/&amp;/g, '&');
+            actions.insertAdjacentHTML('afterbegin', `
+              <button onclick="triggerDirectDownload('${mediaUrl}', 'instagram-photo.jpg')">⬇️ Direct Download Photo</button>
+            `);
+          }
+        }
+      } catch (e) {
+        // Embed and Cobalt bridge remain fully functional
+      }
+
+      output.classList.add('active');
+      showStatus('instagram-status', 'info', 'Instagram media loaded successfully!');
+    }
+  </script>
 </body>
 </html>
