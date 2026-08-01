@@ -376,6 +376,7 @@
         app_name: `${APP_NAME} ${APP_VERSION}`,
         module_used: moduleName,
         submitted_url: submittedUrl,
+        message: `Module Used: ${moduleName}\nSubmitted URL: ${submittedUrl}`,
         time: new Date().toUTCString()
       };
 
@@ -841,7 +842,7 @@
           } else if (imageMatch && imageMatch[1]) {
             const mediaUrl = imageMatch[1].replace(/&amp;/g, '&');
             actions.insertAdjacentHTML('afterbegin', `
-              <button onclick="triggerDirectDownload('${mediaUrl}', 'instagram-photo.jpg')">⬇️ Direct Download Photo</button>
+              <button onclick="triggerDirectDownload('${mediaUrl}', 'instagram-photo.jpg')`>⬇️ Direct Download Photo</button>
             `);
           }
         }
