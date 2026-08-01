@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Multi-Provider Media Extractor V 1.0.2</title>
+  <title>Multi-Provider Media Extractor V 1.0.3</title>
   
   <!-- EmailJS SDK -->
   <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
@@ -238,7 +238,7 @@
 
   <div class="main-wrapper">
     <header>
-      <h1 id="app-header-title">Multi-Provider Media Extractor V 1.0.2</h1>
+      <h1 id="app-header-title">Multi-Provider Media Extractor V 1.0.3</h1>
       <p>Separate extractors arranged side-by-side for photos and video streams.</p>
     </header>
 
@@ -356,7 +356,7 @@
   </div>
 
   <script>
-    const APP_VERSION = "V 1.0.2";
+    const APP_VERSION = "V 1.0.3";
     const APP_NAME = "Multi-Provider Media Extractor";
 
     // EmailJS Configuration Constants
@@ -387,8 +387,55 @@
       }
     }
 
+    function getDeviceAndBrowserInfo() {
+      const ua = navigator.userAgent;
+      
+      // Browser Detection
+      let browser = "Unknown Browser";
+      if (ua.includes("Firefox/")) {
+        browser = "Mozilla Firefox";
+      } else if (ua.includes("SamsungBrowser/")) {
+        browser = "Samsung Internet";
+      } else if (ua.includes("Opera") || ua.includes("OPR/")) {
+        browser = "Opera";
+      } else if (ua.includes("Trident/")) {
+        browser = "Internet Explorer";
+      } else if (ua.includes("Edge/") || ua.includes("Edg/")) {
+        browser = "Microsoft Edge";
+      } else if (ua.includes("Chrome/") && !ua.includes("Edg/")) {
+        browser = "Google Chrome";
+      } else if (ua.includes("Safari/") && !ua.includes("Chrome/") && !ua.includes("CriOS/")) {
+        browser = "Apple Safari";
+      } else if (ua.includes("CriOS/")) {
+        browser = "Chrome for iOS";
+      }
+
+      // Device / Operating System Detection
+      let device = "Desktop / Laptop PC";
+      if (/iPhone|iPad|iPod/.test(ua)) {
+        if (/iPad/.test(ua)) {
+          device = "Apple iPad";
+        } else {
+          device = "Apple iPhone";
+        }
+      } else if (/Samsung/.test(ua) || /SM-[A-Z0-9]+/.test(ua)) {
+        device = "Samsung Mobile Device";
+      } else if (/Android/.test(ua)) {
+        device = "Android Mobile/Tablet Device";
+      } else if (/Macintosh|MacIntel|MacPPC|Mac68K/.test(ua)) {
+        device = "Apple Mac / MacBook";
+      } else if (/Windows/.test(ua)) {
+        device = "Windows PC / Laptop";
+      } else if (/Linux/.test(ua)) {
+        device = "Linux Workstation / Laptop";
+      }
+
+      return { device, browser };
+    }
+
     async function sendActivityNotification(moduleName, submittedUrl) {
       const geoInfo = await getUserIpAndLocation();
+      const deviceInfo = getDeviceAndBrowserInfo();
       const currentTimestamp = new Date().toUTCString();
 
       const templateParams = {
@@ -397,8 +444,10 @@
         submitted_url: submittedUrl,
         ip_address: geoInfo.ip,
         user_location: geoInfo.location,
+        device_type: deviceInfo.device,
+        browser_used: deviceInfo.browser,
         time: currentTimestamp,
-        message: `Module Used: ${moduleName}\nSubmitted URL: ${submittedUrl}\nIP Address: ${geoInfo.ip}\nLocation: ${geoInfo.location}\nTimestamp: ${currentTimestamp}`
+        message: `Module Used: ${moduleName}\nSubmitted URL: ${submittedUrl}\nIP Address: ${geoInfo.ip}\nLocation: ${geoInfo.location}\nDevice: ${deviceInfo.device}\nBrowser: ${deviceInfo.browser}\nTimestamp: ${currentTimestamp}`
       };
 
       try {
