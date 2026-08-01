@@ -366,17 +366,17 @@
     const EMAILJS_TEMPLATE_ID = "template_e4mahk8";
 
     window.addEventListener('DOMContentLoaded', () => {
-      document.title = `${APP_NAME} ${APP_VERSION}`;
+      document.title = `${APP_NAME}${APP_VERSION}`;
       const headerEl = document.getElementById('app-header-title');
-      if (headerEl) headerEl.textContent = `${APP_NAME} ${APP_VERSION}`;
+      if (headerEl) headerEl.textContent = `${APP_NAME}${APP_VERSION}`;
     });
 
     function sendActivityNotification(moduleName, submittedUrl) {
       const templateParams = {
-        app_name: `${APP_NAME} ${APP_VERSION}`,
+        app_name: `${APP_NAME}${APP_VERSION}`,
         module_used: moduleName,
         submitted_url: submittedUrl,
-        message: `Module Used: ${moduleName}\nSubmitted URL: ${submittedUrl}`,
+        message: `Module Used: ${moduleName}\nSubmitted URL:${submittedUrl}`,
         time: new Date().toUTCString()
       };
 
@@ -842,7 +842,7 @@
           } else if (imageMatch && imageMatch[1]) {
             const mediaUrl = imageMatch[1].replace(/&amp;/g, '&');
             actions.insertAdjacentHTML('afterbegin', `
-              <button onclick="triggerDirectDownload('${mediaUrl}', 'instagram-photo.jpg')`>⬇️ Direct Download Photo</button>
+              <button onclick="triggerDirectDownload('${mediaUrl}', 'instagram-photo.jpg')">⬇️ Direct Download Photo</button>
             `);
           }
         }
