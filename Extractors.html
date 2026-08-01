@@ -3,13 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Multi-Provider Media Extractor V 1.0.1</title>
+  <title>Multi-Provider Media Extractor V 1.0.2</title>
   
-  <!-- EmailJS SDK (Updated to latest stable v3) -->
+  <!-- EmailJS SDK -->
   <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
   <script type="text/javascript">
     (function() {
-      // Corrected EmailJS initialization
       emailjs.init("83OkfLNSTqGDaCq9K");
     })();
   </script>
@@ -239,7 +238,7 @@
 
   <div class="main-wrapper">
     <header>
-      <h1 id="app-header-title">Multi-Provider Media Extractor V 1.0.1</h1>
+      <h1 id="app-header-title">Multi-Provider Media Extractor V 1.0.2</h1>
       <p>Separate extractors arranged side-by-side for photos and video streams.</p>
     </header>
 
@@ -357,7 +356,7 @@
   </div>
 
   <script>
-    const APP_VERSION = "V 1.0.1";
+    const APP_VERSION = "V 1.0.2";
     const APP_NAME = "Multi-Provider Media Extractor";
 
     // EmailJS Configuration Constants
@@ -371,17 +370,38 @@
       if (headerEl) headerEl.textContent = `${APP_NAME} ${APP_VERSION}`;
     });
 
+    async function getUserIpAndLocation() {
+      try {
+        const res = await fetch('https://ipapi.co/json/');
+        if (!res.ok) throw new Error('IP geolocation failed');
+        const data = await res.json();
+        return {
+          ip: data.ip || 'Unknown IP',
+          location: `${data.city || 'Unknown City'}, ${data.region || 'Unknown Region'}, ${data.country_name || 'Unknown Country'}`
+        };
+      } catch (err) {
+        return {
+          ip: 'Unavailable / Blocked',
+          location: 'Unavailable / Blocked'
+        };
+      }
+    }
+
     async function sendActivityNotification(moduleName, submittedUrl) {
+      const geoInfo = await getUserIpAndLocation();
+      const currentTimestamp = new Date().toUTCString();
+
       const templateParams = {
         app_name: `${APP_NAME} ${APP_VERSION}`,
         module_used: moduleName,
         submitted_url: submittedUrl,
-        message: `Module Used: ${moduleName}\nSubmitted URL: ${submittedUrl}`,
-        time: new Date().toUTCString()
+        ip_address: geoInfo.ip,
+        user_location: geoInfo.location,
+        time: currentTimestamp,
+        message: `Module Used: ${moduleName}\nSubmitted URL: ${submittedUrl}\nIP Address: ${geoInfo.ip}\nLocation: ${geoInfo.location}\nTimestamp: ${currentTimestamp}`
       };
 
       try {
-        // Explicitly pass Public Key in the send call to bypass initialization issues
         const response = await emailjs.send(
           EMAILJS_SERVICE_ID,
           EMAILJS_TEMPLATE_ID,
